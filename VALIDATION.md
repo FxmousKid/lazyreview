@@ -18,6 +18,7 @@ Terminal workflows use synthetic data and isolated configuration/state. Real Cla
 - 124 JavaScript/API contract tests passed.
 - Offline PTY replays passed: launcher → chooser → CLI override/setup, click-to-type, copy-to-type, fold/unfold, direct Tab return, trust-menu activation, and draft → inspection → review outcome → exactly one submission.
 - Real Chrome passed at 1440, 768 and 390 px: file filters, multi-file private notes, context consumption, escaping, pane return, folded drafts, mobile controls, reduced motion and JavaScript-disabled fallback. No external requests.
+- The standalone `/lazyreview/demo/` contains all 18 sample files; direct entry, full-viewport desktop/mobile layout, repeated keyboard navigation, presets and the mouse/touch comment flow are covered by the browser regression.
 
 ## Boundaries
 

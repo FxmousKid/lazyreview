@@ -1,18 +1,20 @@
-import {cp,mkdir,rm,writeFile,stat} from 'node:fs/promises';
+import {cp,mkdir,rm,writeFile,stat,readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {join,extname} from 'node:path';
+import {join,extname,basename} from 'node:path';
 import {sample} from '../lib/sample.ts';
 import {parsePatch,categorize} from '../lib/review.ts';
 const root=fileURLToPath(new URL('../',import.meta.url));
 export async function buildSite(){
  const out=join(root,'dist/site');await rm(out,{recursive:true,force:true});await mkdir(out,{recursive:true});
  const allowed=new Set(['.html','.css','.js','.json','.svg','.png','.jpg','.webp','.woff2','.ttf','.txt']);
- await cp(join(root,'site'),out,{recursive:true,filter:async p=>(await stat(p)).isDirectory()||allowed.has(extname(p))});
- const picks=['src/components/command-menu/use-keyboard-navigation.ts','src/components/command-menu/command-menu.tsx','src/components/command-menu/__tests__/command-menu.test.tsx','docs/components/command-menu.md'];
- const files=sample.files.filter(f=>picks.includes(f.filename)).map(f=>({...f,category:categorize(f.filename),lines:parsePatch(f.patch||'')}));
- if(files.length<3)throw Error('Showcase needs implementation, tests and docs sample files');
- const data={title:sample.title,owner:sample.owner,repo:sample.repo,number:sample.number,files};
- await writeFile(join(out,'sample-data.js'),'window.LR_SAMPLE='+JSON.stringify(data).replaceAll('<','\\u003c')+';\n');
+ await cp(join(root,'site'),out,{recursive:true,filter:async p=>basename(p)!=='partials'&&((await stat(p)).isDirectory()||allowed.has(extname(p)))});
+ const fullFiles=sample.files.map(f=>({...f,category:categorize(f.filename),lines:parsePatch(f.patch||'')}));
+ const fullData={title:sample.title,owner:sample.owner,repo:sample.repo,number:sample.number,files:fullFiles};
+ await writeFile(join(out,'demo-data.js'),'window.LR_SAMPLE='+JSON.stringify(fullData).replaceAll('<','\\u003c')+';\n');
+ const template=await readFile(join(root,'site/demo/index.html'),'utf8');
+ const workbench=(await readFile(join(root,'site/partials/workbench.html'),'utf8')).replaceAll('src="assets/','src="../assets/');
+ if(template.split('<!-- WORKBENCH -->').length!==2)throw Error('Demo template must contain exactly one workspace');
+ await writeFile(join(out,'demo/index.html'),template.replace('<!-- WORKBENCH -->',workbench));
  await cp(join(root,'demo/lazyreview-demo.mp4'),join(out,'assets/tour.mp4'));
  return out;
 }

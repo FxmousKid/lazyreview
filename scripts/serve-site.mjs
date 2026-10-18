@@ -8,7 +8,7 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 const server=createServer(async(req,res)=>{
  try{
   const url=new URL(req.url,'http://localhost');
-  if(url.pathname==='/'||url.pathname==='/lazyreview'){res.writeHead(308,{location:'/lazyreview/'});res.end();return;}
+  if(['/', '/lazyreview', '/lazyreview/demo'].includes(url.pathname)){res.writeHead(308,{location:(url.pathname==='/'?'/lazyreview/':url.pathname+'/')+url.search});res.end();return;}
   if(!url.pathname.startsWith('/lazyreview/'))throw Error('missing');
   let file=resolve(root,decodeURIComponent(url.pathname.slice('/lazyreview/'.length))||'index.html');
   if(!file.startsWith(root+sep))throw Error('invalid path');

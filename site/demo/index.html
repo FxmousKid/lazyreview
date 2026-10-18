@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LazyReview — interactive demo</title>
+  <meta name="description" content="Try a full-screen sample review: explore 18 changed files, select code, queue private AI questions and preview your review.">
+  <meta name="theme-color" content="#0d1117">
+  <link rel="canonical" href="https://iyan.nz/lazyreview/demo/">
+  <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="demo.css">
+  <script defer src="../demo-data.js"></script>
+  <script defer src="../app.js"></script>
+</head>
+<body class="demo-page">
+  <header class="demo-toolbar">
+    <a class="wordmark" href="../" aria-label="Back to LazyReview"><svg aria-hidden="true" viewBox="0 0 32 32"><path d="M6 5v22h20v-6H12V5z"/><path d="m17 6 7 6-7 6" fill="none" stroke="currentColor" stroke-width="3"/></svg>LazyReview</a>
+    <h1 class="sr-only">LazyReview interactive demo</h1>
+    <span class="demo-disclosure">Sample PR · scripted AI</span>
+    <nav aria-label="Demo controls">
+      <button type="button" id="demo-help">Keys <kbd>?</kbd></button>
+      <button type="button" id="reset-demo">Reset</button>
+      <a href="../#install">Get the app <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+  <noscript><p class="no-script">Enable JavaScript to try the interactive demo. The terminal preview is shown below. <a href="../">Back to the project</a>.</p></noscript>
+  <main class="demo-main" aria-label="Sample review workspace">
+    <!-- WORKBENCH -->
+  </main>
+  <dialog id="demo-dialog"><div class="dialog-top"><h2 id="dialog-title">Private question</h2><button type="button" id="dialog-close" aria-label="Close dialog">×</button></div><div id="dialog-body"></div></dialog>
+  <div class="notice" id="notice" role="status"></div>
+</body>
+</html>

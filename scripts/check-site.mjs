@@ -32,15 +32,24 @@ try{
   const key=async(key,modifiers=0,code)=>{const vk=({Escape:27,Enter:13,Tab:9,']':221})[key]||key.toUpperCase().charCodeAt(0);const props={key,modifiers,windowsVirtualKeyCode:vk,nativeVirtualKeyCode:vk,...(code?{code}:{})};await cdp('Input.dispatchKeyEvent',{type:'rawKeyDown',...props});await cdp('Input.dispatchKeyEvent',{type:'keyUp',...props});await wait(30);};
   const viewport=async(width,height)=>{await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<600});};
   await cdp('Page.enable');await cdp('Runtime.enable');await cdp('Network.enable');await viewport(1440,900);
+  const homeUrl=url;
+  await cdp('Page.navigate',{url:homeUrl});
+  await wait(400);
+  assert.equal(await evaluate('document.querySelector("#try-review").getAttribute("href")'),'demo/');
+  assert.equal(await evaluate('document.querySelector(".sim")'),null);
+  assert.equal(await evaluate('document.querySelector(".demo-poster").getAttribute("href")'),'demo/');
+  url=new URL('demo/',homeUrl).href;
   await cdp('Page.navigate',{url});
   for(let i=0;i<100;i++){if(await evaluate('!!window.LR_SAMPLE && document.querySelector(".sim")?.hidden===false'))break;await wait(50);}
   assert.equal(await evaluate('document.querySelector(".sim").hidden'),false);
   await evaluate('document.fonts.ready');await wait(800);
   assert.equal(await evaluate('getComputedStyle(document.querySelector(".fallback-workspace")).display'),'none');
-  assert.equal(await evaluate('document.querySelectorAll("[data-file]").length'),4);
-  await click('[data-filter="Docs"]');assert.equal(await evaluate('document.querySelectorAll("[data-file]").length'),1);assert.match(await text('#current-file'),/\.md$/);
-  await click('[data-filter="All"]');await type('#file-search','kybrdnvgtn');assert.equal(await evaluate('document.querySelectorAll("[data-file]").length'),1);
+  assert.equal(await evaluate('document.querySelectorAll("[data-file]").length'),18);
+  await click('[data-filter="Docs"]');assert.equal(await evaluate('document.querySelectorAll("[data-file]").length'),3);assert.match(await text('#current-file'),/\.md$/);
+  await click('[data-filter="Code"]');await type('#file-search','kybrdnvgtn');assert.equal(await evaluate('document.querySelectorAll("[data-file]").length'),1);
   await click('#reset-demo');
+  await evaluate('document.querySelector("#diff").focus()');await key('h');await key('j');const afterJ=await text('#current-file');await key('j');assert.notEqual(await text('#current-file'),afterJ);assert.ok(await evaluate('!!document.activeElement.closest(".file-pane")'));
+  await click('#reset-demo');await click('[data-line="1"]');await key('j');assert.equal(await evaluate('document.activeElement.id'),'diff');
   await click('[data-line="1"]');
   await evaluate(`document.querySelector('[data-line="4"]').dispatchEvent(new MouseEvent("click",{bubbles:true,shiftKey:true}))`);
   assert.match(await text('#selection-label'),/\d+ lines selected/);
@@ -49,26 +58,29 @@ try{
   await click('#context-toggle');assert.equal(await evaluate('document.querySelectorAll(".context-note").length'),2);assert.match(await text('#dialog-body'),/<img src=x/);assert.equal(await evaluate('window.__pwn'),undefined);await key('Escape');assert.equal(await evaluate('document.querySelector("dialog").open'),false);
   await type('#chat-input','Explain how these files interact');await click('#chat-form button');assert.equal(await text('#context-count'),'0');assert.match(await text('#chat'),/Sample context/);assert.match(await text('#chat'),/Scripted demo reply/);
   await type('#chat-input','A general PR question');await key(']',2,'BracketRight');assert.equal(await evaluate('document.activeElement.id'),'diff');
-  await click('#viewed-toggle');assert.match(await text('#viewed-count'),/^1 \/ 4/);
+  await click('#viewed-toggle');assert.match(await text('#viewed-count'),/^1 \/ 18/);
   await click('#layout-toggle');assert.equal(await evaluate('document.querySelectorAll(".split-half").length'),2);await click('#layout-toggle');
-  await click('[data-line="1"]');await evaluate('document.querySelector("#diff").focus()');await key('c');await type('#note-body','A sample code comment');await click('#note-form button');await click('#review-toggle');assert.equal(await evaluate('document.querySelector("#dialog-body details").open'),false);await click('#dialog-body summary');assert.match(await text('#dialog-body'),/A sample code comment/);await click('[data-outcome="Approve"]');assert.match(await text('#dialog-body'),/no GitHub request/);await key('Escape');
+  await click('[data-line="1"]');await click('#comment-toggle');await type('#note-body','A sample code comment');await click('#note-form button');await click('#review-toggle');assert.equal(await evaluate('document.querySelector("#dialog-body details").open'),false);await click('#dialog-body summary');assert.match(await text('#dialog-body'),/A sample code comment/);await click('[data-outcome="Approve"]');assert.match(await text('#dialog-body'),/no GitHub request/);await key('Escape');
   await evaluate('document.querySelector(".wordmark").focus()');await key('r');assert.equal(await evaluate('document.querySelector("dialog").open'),false);
   await evaluate('document.querySelector("#diff").focus()');await key('g');await key('a');assert.equal(await evaluate('document.activeElement.id'),'chat-input');await key(']',2,'BracketRight');assert.equal(await evaluate('document.activeElement.id'),'diff');
   await mkdir(new URL('../outputs/',import.meta.url),{recursive:true});
+  await wait(3300); // Let transient draft feedback clear before photographing the workspace.
   for(const width of [1440,768,390]){
     await viewport(width,width<600?844:900);await evaluate('window.scrollTo({top:0,behavior:"instant"})');await wait(400);
     assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'),`Page overflows at ${width}`);
-    const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(new URL(`../outputs/site-${width}.png`,import.meta.url),Buffer.from(shot.data,'base64'));
+    assert.ok(await evaluate('document.documentElement.scrollHeight<=innerHeight+1'),`Demo is not full-viewport at ${width}`);
+    const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(new URL(`../outputs/demo-${width}.png`,import.meta.url),Buffer.from(shot.data,'base64'));
   }
   await click('[data-pane="files"]');await click('[data-filter="Tests"]');await click('[data-file]');assert.equal(await evaluate('document.querySelector(".sim").dataset.mobilePane'),'changes');await click('[data-line="1"]');await click('#note-toggle');await type('#note-body','Mobile question');await click('#note-form button');await click('[data-pane="companion"]');assert.equal(await text('#context-count'),'1');await type('#chat-input','Explain the tests');await click('#chat-form button');assert.equal(await text('#context-count'),'0');
-  await click('#reset-demo');assert.equal(await text('#draft-count'),'0');assert.equal(await text('#viewed-count'),'0 / 4 viewed');
+  await click('#reset-demo');assert.equal(await text('#draft-count'),'0');assert.equal(await text('#viewed-count'),'0 / 18 viewed');
+  for(const preset of ['?filter=Code','?select=1']){await cdp('Page.navigate',{url:url+preset});await wait(350);if(preset.includes('filter'))assert.ok(await evaluate('[...document.querySelectorAll("[data-file]")].every(b=>window.LR_SAMPLE.files[+b.dataset.file].category==="Code")'));else assert.equal(await evaluate('document.querySelector("#note-toggle").disabled'),false);}
   await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});assert.equal(await evaluate('getComputedStyle(document.querySelector("h1")).opacity'),'1');
   await cdp('Emulation.setScriptExecutionDisabled',{value:true});await cdp('Page.navigate',{url});await wait(500);
   assert.notEqual(await evaluate('getComputedStyle(document.querySelector(".fallback-workspace")).display'),'none');
   assert.equal(await evaluate('document.querySelector(".sim").hidden'),true);
   assert.ok(await evaluate('document.querySelector(".fallback-workspace").naturalWidth>0'));
   assert.deepEqual(errors,[]);assert.ok(requests.every(u=>u.startsWith(new URL(url).origin)||u.startsWith('data:')),'Unexpected external request');
-  console.log('PASS showcase: real Chrome, filters, multi-file notes, escaping, scripted replies, Ctrl-], drafts, keyboard scope, mobile, reduced motion, no-JS fallback; no external requests.');
+  console.log('PASS standalone /demo/: real Chrome, showcase links, 18 files, direct entry, full viewport, keyboard focus, filters, multi-file notes, escaping, scripted replies, Ctrl-], drafts, keyboard scope, mobile, reduced motion, no-JS fallback; no external requests.');
 }finally{
   if(ws?.readyState===WebSocket.OPEN){try{await send('Browser.close');}catch{}ws.close();}
   browser?.kill();server?.kill();await wait(250);await rm(profile,{recursive:true,force:true});

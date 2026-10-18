@@ -3,7 +3,7 @@
   const $ = (s, root = document) => root.querySelector(s);
   const $$ = (s, root = document) => [...root.querySelectorAll(s)];
   const stage = $('#playground'), sim = $('.sim'), dialog = $('#demo-dialog');
-  const initialChat = $('#chat').innerHTML;
+  const initialChat = $('#chat')?.innerHTML || '';
   const data = window.LR_SAMPLE;
   const escape = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let state, noticeTimer, prefixTimer, prefix = '', returnFocus;
@@ -19,7 +19,8 @@
   function close() { dialog.close(); returnFocus?.focus({preventScroll:true}); }
   $('#dialog-close').onclick = close;
   dialog.addEventListener('click', e => {if (e.target === dialog) {const r = dialog.getBoundingClientRect(); if(e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) close();}});
-  $('#copy-install').onclick = async () => {
+  const copyInstall = $('#copy-install');
+  if(copyInstall) copyInstall.onclick = async () => {
     const code = $('.install-command code');
     try {await navigator.clipboard.writeText(code.textContent); notify('Commands copied');}
     catch {const r = document.createRange(); r.selectNodeContents(code); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); notify('Commands selected. Copy with your keyboard.');}
@@ -30,7 +31,7 @@
     $$('[data-reveal]').forEach((el, i) => {el.style.transitionDelay = `${Math.min(i % 3, 2) * 65}ms`; observer.observe(el);});
     document.documentElement.classList.add('motion-ready');
   }
-  if (!data?.files?.length) return;
+  if (!data?.files?.length || !stage) return;
   const files = data.files;
   function reset() {
     state = {file:0, category:'All', query:'', pane:'changes', viewed:new Set(), split:false, anchor:null, end:null, cursor:1, visual:false, notes:[], drafts:[]};
@@ -46,6 +47,7 @@
   }
   function setFile(index) {state.file = index; state.anchor = state.end = null; state.cursor = Math.max(0,current().lines.findIndex(l => l.kind!=='hunk')); state.visual=false; render();}
   function renderFiles() {
+    const restoreFocus=!!document.activeElement?.closest('#file-list');
     const shown=matching(); $('#file-count').textContent=`${shown.length} / ${files.length}`;
     let folder='', html='';
     for(const f of shown) {
@@ -53,9 +55,10 @@
       if(folder!==parent) {folder=parent; html+=`<div class="tree-folder" aria-hidden="true">▾ ${escape(parent)}/</div>`;}
       const notes=state.notes.filter(n=>n.path===f.filename).length;
       // taste-skill-ignore: native viewed-state checkmark, inside the data-ui file tree.
-      html+=`<button class="file-entry ${state.file===f.index?'active':''}" role="treeitem" aria-selected="${state.file===f.index}" data-file="${f.index}" title="${escape(f.filename)}"><span class="file-status">${state.viewed.has(f.index)?'✓':'M'}</span>${notes?`<span class="note-badge" aria-label="${notes} private notes">${notes}</span>`:''}<span class="filename">${escape(name)}</span><span class="counts"><span class="plus">+${f.additions}</span><span class="minus">−${f.deletions}</span></span></button>`; // taste-skill-ignore: native viewed-state glyph inside data-ui.
+      html+=`<button class="file-entry ${state.file===f.index?'active':''}" role="treeitem" aria-selected="${state.file===f.index}" data-file="${f.index}" title="${escape(f.filename)}"><span class="file-status">${state.viewed.has(f.index)?'✓':f.status==='added'?'A':f.status==='removed'?'D':f.status==='renamed'?'R':'M'}</span>${notes?`<span class="note-badge" aria-label="${notes} private notes">${notes}</span>`:''}<span class="filename">${escape(name)}</span><span class="counts"><span class="plus">+${f.additions}</span><span class="minus">−${f.deletions}</span></span></button>`; // taste-skill-ignore: native viewed-state glyph inside data-ui.
     }
     $('#file-list').innerHTML = html || '<p class="empty-files">No matching files</p>';
+    if(restoreFocus)($(`[data-file="${state.file}"]`)||$('#file-list button')||$('#file-search')).focus({preventScroll:true});
     $$('[data-file]').forEach(b => b.onclick=()=>{setFile(+b.dataset.file);setPane('changes');});
     $$('[data-filter]').forEach(b=>{b.classList.toggle('active',b.dataset.filter===state.category);b.setAttribute('aria-pressed',b.dataset.filter===state.category);});
   }
@@ -81,7 +84,7 @@
   function renderDiff() {
     const file=current(), lines=file.lines, selected=selectedIndices();
     $('#current-file').textContent=file.filename; $('#current-file').title=file.filename;
-    const diff=$('#diff'), scroll=diff.scrollTop;
+    const diff=$('#diff'), scroll=diff.scrollTop, restoreFocus=diff.contains(document.activeElement);
     if(state.split) {
       // Pair contiguous deleted and added blocks, padding the shorter side.
       const pairs=[]; let i=0;
@@ -95,9 +98,11 @@
       diff.innerHTML=`<div class="split-columns">${['old','new'].map((side,column)=>`<div class="split-half"><div class="split-title">${column?'Modified':'Original'}</div>${pairs.map(pair=>row(lines[pair[column]],pair[column],side)).join('')}</div>`).join('')}</div>`;
     } else diff.innerHTML=lines.map((l,i)=>row(l,i)).join('');
     diff.scrollTop=scroll;
+    if(restoreFocus)diff.focus({preventScroll:true});
     $$('[data-line]',diff).forEach(b=>b.onclick=e=>{const i=+b.dataset.line; if(!e.shiftKey||state.anchor===null||lines[state.anchor].hunk!==lines[i].hunk)state.anchor=i;state.end=state.cursor=i;state.visual=false;setPane('changes',false);renderDiff();});
     $('#selection-label').textContent=selected.length?`${selected.length} line${selected.length===1?'':'s'} selected`:'Click a line · Shift-click for a range';
     $('#note-toggle').disabled=!selected.length;
+    $('#comment-toggle').disabled=!selected.length;
     $('#layout-toggle').textContent=state.split?'Inline':'Split';
     $('#viewed-toggle').setAttribute('aria-pressed',state.viewed.has(state.file));
     // taste-skill-ignore: viewed-state checkmark mirrors the real terminal control.
@@ -138,13 +143,13 @@
     else if(state.pane==='changes'){const lines=current().lines;let i=Math.max(0,Math.min(lines.length-1,state.cursor+delta));if(lines[i].kind==='hunk')i=Math.max(0,Math.min(lines.length-1,i+delta));state.cursor=i;if(state.visual)state.end=i;renderDiff();$(`[data-line="${i}"]`)?.scrollIntoView({block:'nearest',inline:'nearest'});}
   }
   $('#reset-demo').onclick=()=>{reset();notify('Sample review reset');};
-  $('#try-review').addEventListener('click',()=>{setPane('changes');stage.focus({preventScroll:true});});
+  $('#try-review')?.addEventListener('click',()=>{setPane('changes');stage.focus({preventScroll:true});});
   $$('[data-pane]').forEach(b=>b.onclick=()=>setPane(b.dataset.pane));
   $$('[data-filter]').forEach(b=>b.onclick=()=>{state.category=b.dataset.filter;const shown=matching();if(shown.length&&!shown.some(f=>f.index===state.file))setFile(shown[0].index);else renderFiles();setPane('files',false);});
   $('#file-search').oninput=e=>{state.query=e.target.value;renderFiles();};
   $('#layout-toggle').onclick=()=>{state.split=!state.split;renderDiff();};
   $('#viewed-toggle').onclick=()=>{state.viewed.has(state.file)?state.viewed.delete(state.file):state.viewed.add(state.file);render();};
-  $('#note-toggle').onclick=()=>compose();$('#context-toggle').onclick=showContext;$('#review-toggle').onclick=showReview;$('#chat-form').onsubmit=ask;
+  $('#note-toggle').onclick=()=>compose();$('#comment-toggle').onclick=()=>compose('comment');$('#context-toggle').onclick=showContext;$('#review-toggle').onclick=showReview;$('#chat-form').onsubmit=ask;
   $('#chat-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();ask(e);}});
   $$('.sim-panes>aside,.sim-panes>section').forEach(p=>p.addEventListener('focusin',()=>setPane(p.classList.contains('file-pane')?'files':p.classList.contains('changes-pane')?'changes':'companion',false)));
   $$('[data-action]').forEach(b=>b.onclick=()=>{if(b.dataset.action==='filter-code'){state.category='Code';state.query='';$('#file-search').value='';setFile(matching()[0].index);setPane('files');}else{state.category='All';state.query='';$('#file-search').value='';setFile(0);state.anchor=state.cursor;state.end=state.cursor+3;renderDiff();setPane('changes');notify('A range is selected. Choose “Ask about this”.');}});
@@ -167,7 +172,14 @@
     else if(key==='m'){e.preventDefault();$('#viewed-toggle').click();}
     else if(key==='r'){e.preventDefault();showReview();}
     else if(key==='Escape'){state.anchor=state.end=null;state.visual=false;renderDiff();}
-    else if(key==='?'){e.preventDefault();open('Sample keys','<p>j / k · move<br>n / N · next / previous file<br>h / l · change pane<br>/ · find a file<br>v then j / k · select lines<br>t · queue a private AI note<br>g c · inspect context<br>g a · ask Claude<br>Ctrl-] · return to changes<br>s · split / inline<br>m · viewed<br>c · sample GitHub comment<br>r · sample review</p><p class="small">Click and Shift-click also select code. The full terminal app has more keys; see its README.</p>');}
+    else if(key==='?'){e.preventDefault();showKeys();}
   });
+  function showKeys(){open('Sample keys','<p>j / k · move<br>n / N · next / previous file<br>h / l · change pane<br>/ · find a file<br>v then j / k · select lines<br>t · queue a private AI note<br>g c · inspect context<br>g a · ask Claude<br>Ctrl-] · return to changes<br>s · split / inline<br>m · viewed<br>c · sample GitHub comment<br>r · sample review</p><p class="small">Click and Shift-click also select code. The full terminal app has more keys; see its README.</p>');}
+  $('#demo-help')?.addEventListener('click',showKeys);
   $('.fallback-workspace').hidden=true;sim.hidden=false;reset();
+  const params=new URLSearchParams(location.search);
+  const category=params.get('filter');
+  if($$('[data-filter]').some(b=>b.dataset.filter===category)){state.category=category;setFile(matching()[0].index);}
+  if(params.get('select')==='1'){state.anchor=state.cursor;state.end=state.cursor+3;renderDiff();}
+  if(document.body.classList.contains('demo-page'))stage.focus({preventScroll:true});
 })();

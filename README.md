@@ -44,6 +44,6 @@ Settings: `~/.config/lazyreview/config.yml` ([example](tui/config.example.yml)).
 
 `npm test` · `cargo test --locked --manifest-path tui/Cargo.toml` · `npm run site:dev`
 
-The showcase in `site/` is static and works under `/lazyreview/`. Its interactive sample makes no GitHub or AI requests.
+The showcase in `site/` is static and works under `/lazyreview/`. The full-screen browser demo lives at `/lazyreview/demo/` and makes no GitHub or AI requests.
 
 MIT © Iyan Nazarian
