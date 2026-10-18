@@ -1,0 +1,107 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';
+import {join,resolve} from 'node:path';
+import {tmpdir} from 'node:os';
+import {randomUUID} from 'node:crypto';
+import {SYSTEM,patchEvidence,currentAttachments,questionContext,briefing} from '../tui/src/ai-context.mjs';
+import {Companion} from '../tui/src/ai-session.mjs';
+import {callTool,recordReadReceipt,sourceReceipts} from '../tui/src/ai-tools.mjs';
+const migration='@@ -1 +1 @@\n-USING (true);\n+USING (member_id = auth.uid());';
+const pr={url:'https://github.com/example/lazyreview/pull/42',base:'b'.repeat(40),head:'a'.repeat(40),baseRepo:'example/lazyreview',headRepo:'example/lazyreview',body:'Everyone can access every record now.',title:'Member access',files:[{filename:'docs/overview.md',patch:'d'.repeat(32000)},{filename:'db/migrations/member.sql',patch:migration,status:'modified'}]};
+const config={enabled:true,profile:'evidence-test',command:'fixture',model:'fixture',maxBudgetUsd:1,autoPrepare:false};
+const attachment=(id,extra={})=>({id,side:'RIGHT',commit:pr.head,path:'db/migrations/member.sql',start:1,end:1,content:'USING (member_id = auth.uid());',...extra});
+const settle=async c=>{if(c.active)await c.active.done;};
+async function fixture(t){
+  const root=await mkdtemp(join(tmpdir(),'rw-evidence-test-')),events=[];
+  const c=new Companion(e=>events.push(e),{root,spawnCli:(_command,args,options)=>spawn(process.execPath,[resolve('tests/claude-evidence-fixture.mjs'),...args],options)});
+  t.after(async()=>{await c.close();await rm(root,{recursive:true,force:true});});
+  await c.open({pr,config,binding:'one'});return {c,events,root};
+}
+test('implementation evidence survives an earlier large docs patch and is bounded',()=>{
+  const packet=patchEvidence(pr,'Explain this PR');
+  assert.equal(packet.patches[0].path,'db/migrations/member.sql');
+  assert.ok(briefing(pr).includes('+USING (member_id = auth.uid())'));
+  assert.equal(packet.patches[1].complete,false);
+  assert.ok(packet.patches.reduce((n,p)=>n+p.patch.length,0)<=32000);
+  assert.ok(SYSTEM.includes('An explanation is not a full review'));
+  assert.ok(SYSTEM.includes('first use changes or read_file'));
+  const crowded={...pr,files:Array.from({length:25},(_,i)=>({filename:`src/feature-${i}.ts`,patch:'x'.repeat(4000)}))};
+  assert.equal(patchEvidence(crowded).patches.length,8);
+  assert.equal(patchEvidence(crowded).omittedPatchCount,17);
+});
+test('explicit attachments, focus and mentioned paths take priority over generic risk ranking',()=>{
+  assert.equal(patchEvidence(pr,'Explain docs/overview.md').patches[0].path,'docs/overview.md');
+  assert.equal(patchEvidence(pr,'Explain this PR',{scope:'file',path:'docs/overview.md'}).patches[0].path,'docs/overview.md');
+  assert.equal(patchEvidence(pr,'Explain this PR',{},[attachment('docs',{path:'docs/overview.md'})]).patches[0].path,'docs/overview.md');
+});
+test('attachments remain complete JSON and only current valid-side entries can be consumed',()=>{
+  const items=[attachment('old',{commit:'c'.repeat(40)}),attachment('bad-side',{side:'WRONG'}),attachment('large',{content:'x'.repeat(170001)}),attachment('ok',{note:'Why does this require membership?'})];
+  assert.deepEqual(currentAttachments(pr,items).map(i=>i.id),['ok']);
+  const context=questionContext(pr,{},items);
+  const encoded=context.slice(context.lastIndexOf(': ')+2);
+  assert.equal(JSON.parse(encoded)[0].note,'Why does this require membership?');
+});
+test('successful code results alone create receipts, with exact source ranges',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'rw-receipts-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const p={...pr,turnId:randomUUID()};
+  const metadata=await callTool(p,'overview');
+  await recordReadReceipt(dir,p,'overview',{},metadata);
+  await assert.rejects(readFile(join(dir,'evidence.json')));
+  const value=await callTool(p,'changes',{path:'db/migrations/member.sql'});
+  await recordReadReceipt(dir,p,'changes',{path:'db/migrations/member.sql'},value);
+  await recordReadReceipt(dir,p,'changes',{path:'db/migrations/member.sql'},value);
+  assert.equal(JSON.parse(await readFile(join(dir,'evidence.json'))).sources.length,1);
+  const fetcher=async()=>Response.json({type:'file',encoding:'base64',size:18,content:Buffer.from('first\nsecond\nthird').toString('base64')});
+  const read=await callTool(p,'read_file',{path:'db/migrations/member.sql',start:2,end:3},fetcher,()=> '');
+  await recordReadReceipt(dir,p,'read_file',{},read);
+  const receipt=JSON.parse(await readFile(join(dir,'evidence.json')));
+  assert.deepEqual(receipt.sources[1],{kind:'source',path:'db/migrations/member.sql',side:'RIGHT',commit:pr.head,start:2,end:3});
+  assert.equal(sourceReceipts(p,'read_file',{}, {...read,text:''}).length,0);
+  assert.equal(sourceReceipts(p,'changes',{path:'image.png'},{patchAvailable:false}).length,0);
+  assert.equal(sourceReceipts(p,'tree',{},{}).length,0);
+});
+test('MCP transport does not record failed calls as inspected code',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'rw-evidence-mcp-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const source=join(dir,'snapshot.json');await writeFile(source,JSON.stringify({...pr,turnId:randomUUID()}));
+  const child=spawn(process.execPath,[resolve('tui/src/ai-tools.mjs'),source],{stdio:['pipe','pipe','ignore']});
+  let out='';child.stdout.on('data',data=>out+=data);
+  const done=new Promise((resolve,reject)=>{child.once('close',resolve);child.once('error',reject);});
+  child.stdin.end(JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'changes',arguments:{path:'missing.sql'}}})+'\n');
+  assert.equal(await done,0);assert.equal(JSON.parse(out).result.isError,true);
+  await assert.rejects(readFile(join(dir,'evidence.json')));
+});
+test('successful turn reports truthful supplied/read evidence and consumes exactly accepted note ids',async t=>{
+  const {c,events}=await fixture(t);
+  const deepId=pr.head+':RIGHT:'+('nested-component/'.repeat(30))+'member.sql:2:4';
+  await c.send({binding:'one',prompt:'READ_PATCH: Explain this PR',context:[attachment('used',{note:'Explain this predicate'}),attachment(deepId),attachment('stale',{commit:'old'})]});await settle(c);
+  const evidence=c.current.evidence;
+  assert.ok(evidence.providedPatchPaths.includes('db/migrations/member.sql'));
+  assert.equal(evidence.readPatchCount,1);assert.equal(evidence.readSourceCount,0);
+  assert.equal(evidence.readSources[0].path,'db/migrations/member.sql');
+  assert.deepEqual(events.find(e=>e.type==='turn_complete').contextIds,['used',deepId]);
+  assert.equal(events.find(e=>e.type==='turn_complete').turnId,events.find(e=>e.type==='turn_accepted').turnId);
+  const prompt=await readFile(join(c.current.dir,'evidence-request.txt'),'utf8');
+  assert.ok(prompt.includes(migration.replaceAll('\n','\\n')));assert.ok(prompt.includes('Explain this predicate'));
+  const dir=c.current.dir;
+  await c.send({binding:'one',prompt:'What did we just establish?'});await settle(c);
+  const resumed=await readFile(join(dir,'evidence-request.txt'),'utf8');
+  assert.ok(resumed.length<2000,'unchanged complete patches and excerpts are both reused');
+  assert.ok(!resumed.includes('USING (member_id = auth.uid())'));
+  assert.ok(resumed.includes('Earlier successful code reads: [{"kind":"patch"'));
+  assert.ok(c.current.evidence.reusedPatchPaths.includes('db/migrations/member.sql'));
+  assert.equal(c.current.evidence.readPatchCount,0);
+  await c.close();await c.open({pr,config,binding:'two'});
+  assert.ok(c.current.evidence.reusedPatchPaths.includes('db/migrations/member.sql'));
+  await c.close();await c.open({pr:{...pr,head:'c'.repeat(40)},config,binding:'three'});
+  assert.equal(c.current.evidence,null);
+});
+test('failed and interrupted turns never consume pending attachments',async t=>{
+  const {c,events}=await fixture(t);
+  await c.send({binding:'one',prompt:'FAIL_TURN',context:[attachment('keep-failure')]});await settle(c);
+  assert.ok(events.some(e=>e.type==='turn_accepted'));assert.ok(!events.some(e=>e.type==='turn_complete'));
+  await c.send({binding:'one',prompt:'STOP_TURN',context:[attachment('keep-stop')]});await c.stop();
+  assert.ok(!events.some(e=>e.type==='turn_complete'));
+  assert.equal(c.current.record.codeContext,undefined);
+});

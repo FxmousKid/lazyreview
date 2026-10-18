@@ -1,0 +1,4 @@
+# Saved original LazyReview palette, including its fixed dark background.
+# Use as ~/.config/lazyreview/config.yml, or run ./lazyreview --theme blue.
+gui:
+  themePreset: blue

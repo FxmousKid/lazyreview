@@ -1,0 +1,17 @@
+{
+  "name": "lazyreview",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "build": "cargo build --release --locked --manifest-path tui/Cargo.toml",
+    "test": "node --test tests/*.test.mjs tests/*.test.ts",
+    "site:dev": "node scripts/serve-site.mjs",
+    "site:build": "node scripts/build-site.mjs",
+    "test:site": "node scripts/check-site.mjs"
+  }
+}

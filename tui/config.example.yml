@@ -1,0 +1,27 @@
+# Save as ~/.config/lazyreview/config.yml (or under XDG_CONFIG_HOME).
+# Lazygit imports your existing colors without changing its configuration.
+gui:
+  themePreset: lazygit # lazygit | blue | custom
+  companionStyle: paper # ledger | paper | studio (g v switches for this session)
+  syntaxTheme: github-dark # github-dark | lunar (H cycles during a session)
+  # Optional overrides use the same gui.theme format as Lazygit:
+  # theme:
+  #   activeBorderColor: ['#a184df', bold]
+  #   inactiveBorderColor: ['#636da6']
+  #   searchingActiveBorderColor: ['#ff966c', bold]
+  #   optionsTextColor: ['#82aaff']
+  #   selectedLineBgColor: ['#2d3f76']
+  #   selectedLineFgColor: [bold]
+  #   unstagedChangesColor: ['#c53b53']
+  #   defaultFgColor: ['#c8d3f5']
+
+# Native CLIs own conversations; see tui/CLI-INTEGRATIONS.md.
+ai:
+  provider: claude # claude | codex | grok; Codex/Grok require terminal
+  enabled: false # g a then Enter, or ./lazyreview --setup-ai, enables this
+  interface: paper # paper | terminal; --ai-interface overrides for one launch
+  profile: default
+  # command: claude # optional executable override
+  # model: sonnet # omit to use provider default
+  autoPrepare: true # terminal: initial orientation when first opening the companion
+  maxBudgetUsd: 1 # Paper per-turn cap; does not limit the interactive terminal

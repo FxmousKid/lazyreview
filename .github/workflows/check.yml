@@ -1,0 +1,24 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+      - name: JavaScript and API contracts
+        run: npm test
+      - name: Static showcase
+        run: npm run site:build
+      - name: Browser sample
+        run: npm run test:site
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component rustfmt
+      - name: Rust format
+        run: cargo +stable fmt --manifest-path tui/Cargo.toml -- --check
+      - name: Native tests
+        run: cargo +stable test --locked --manifest-path tui/Cargo.toml

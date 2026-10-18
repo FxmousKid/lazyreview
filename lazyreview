@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+LAZYREVIEW_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$LAZYREVIEW_ROOT/bin/lazyreview" ]; then
+  exec "$LAZYREVIEW_ROOT/bin/lazyreview" "$@"
+fi
+if [ -x "$LAZYREVIEW_ROOT/tui/target/release/lazyreview" ]; then
+  exec "$LAZYREVIEW_ROOT/tui/target/release/lazyreview" "$@"
+fi
+printf '%s\n' 'Build first: cargo build --release --locked --manifest-path tui/Cargo.toml' >&2
+exit 1

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LazyReview — understand the pull request</title>
+  <meta name="description" content="A Vim-driven GitHub PR reviewer with a persistent Claude Code companion. Try a review in your browser, then bring the workflow to your terminal.">
+  <meta name="theme-color" content="#f4f3ef">
+  <link rel="canonical" href="https://iyan.nz/lazyreview/">
+  <meta property="og:title" content="LazyReview — know what you’re reviewing">
+  <meta property="og:description" content="Your terminal, your GitHub reviews, an AI companion with the code in context.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://iyan.nz/lazyreview/">
+  <meta property="og:image" content="https://iyan.nz/lazyreview/assets/workspace.webp">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/bricolage-600.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="sample-data.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#playground">Skip to the demo</a>
+  <header class="nav wrap">
+    <a href="#" class="wordmark" aria-label="LazyReview home"><svg aria-hidden="true" viewBox="0 0 32 32"><path d="M6 5v22h20v-6H12V5z"/><path d="m17 6 7 6-7 6" fill="none" stroke="currentColor" stroke-width="3"/></svg>LazyReview</a>
+    <nav aria-label="Main navigation"><a href="#workflow">Workflow</a><a href="#questions">Questions</a><a href="#install">Install</a><a href="https://github.com/FxmousKid/lazyreview" class="repo-link">GitHub <span aria-hidden="true">↗</span></a></nav>
+  </header>
+  <main>
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy"><h1 id="hero-title" data-reveal>Know what you’re reviewing</h1><div class="hero-aside"><p data-reveal>A keyboard-first GitHub PR reviewer, with Claude Code beside your code.</p><div class="hero-actions" data-reveal><a href="#playground" class="button primary" id="try-review">Try a review</a><a href="https://github.com/FxmousKid/lazyreview">Get the code ↗</a></div></div></div>
+      <div class="demo-label" data-reveal><span>Interactive sample</span><p>Filter a file. Select some code. Ask about it.</p><button type="button" id="reset-demo">Reset demo</button></div>
+      <div id="playground" class="workbench" data-ui tabindex="0" aria-label="Interactive sample PR reviewer. Press j and k to move, or use the buttons." data-reveal>
+        <img class="fallback-workspace" src="assets/workspace.webp" width="1440" height="720" alt="LazyReview’s file tree, colored diff and Claude companion showing a synthetic command-menu pull request.">
+        <div class="sim" hidden>
+          <div class="sim-head"><span>Add command menu and keyboard navigation</span><button id="review-toggle" type="button">Your review <span id="draft-count">0</span></button><span id="viewed-count">0 viewed</span></div>
+          <div class="mobile-panes" role="group" aria-label="Demo pane"><button data-pane="files" type="button">Files</button><button data-pane="changes" class="active" type="button">Changes</button><button data-pane="companion" type="button">Claude</button></div>
+          <div class="sim-panes">
+            <aside class="file-pane" aria-label="Files"><div class="pane-heading">Files <span id="file-count"></span></div><div class="type-filters" role="group" aria-label="File type"><button data-filter="All" class="active">All</button><button data-filter="Code">Code</button><button data-filter="Tests">Tests</button><button data-filter="Docs">Docs</button></div><label class="file-search"><span class="sr-only">Search files</span><input id="file-search" placeholder="Find a file  /" autocomplete="off" spellcheck="false"></label><div id="file-list" role="tree" aria-label="Changed files"></div></aside>
+            <section class="changes-pane" aria-label="Changes"><div class="pane-heading"><span id="current-file"></span><div><button id="viewed-toggle" type="button" title="Mark file viewed (m)">Viewed</button><button id="layout-toggle" type="button" title="Switch diff layout (s)">Split</button></div></div><div id="diff" tabindex="0" aria-label="Code diff. Click a line, then Shift-click another line for a range."></div><div class="selection-bar"><span id="selection-label">Click a line to select code</span><button id="note-toggle" type="button">Ask about this</button></div></section>
+            <aside class="companion-pane" aria-label="Claude companion"><div class="pane-heading">Claude companion <button id="context-toggle" type="button" title="Queued context (g c)">Context <span id="context-count">0</span></button></div><div class="paper-chat" id="chat" aria-live="polite"><p class="sample-label">Scripted sample conversation</p><p class="chat-question">What is this PR doing?</p><div class="answer"><p>It adds a command menu you can navigate with the keyboard.</p><p>The important relationship is between the <strong>filtered results</strong>, the <strong>active index</strong> and the command that Enter runs.</p><p>Select code from a file to explore that relationship.</p></div></div><form id="chat-form"><label class="sr-only" for="chat-input">Ask a sample question</label><textarea id="chat-input" rows="2" placeholder="Ask about the PR…"></textarea><div><span>Demo replies · no AI calls</span><button type="submit" aria-label="Send sample question">Send ↵</button></div></form></aside>
+          </div>
+          <div class="sim-foot"><span>acme/atlas #128</span><span><kbd>j k</kbd> move <kbd>v</kbd> select <kbd>t</kbd> note <kbd>g a</kbd> Claude <kbd>?</kbd> keys</span></div>
+        </div>
+      </div>
+      <p class="demo-caption">A browser sample of the workflow. The terminal app uses your GitHub account and your installed AI CLI.</p>
+    </section>
+    <section id="workflow" class="workflow wrap" aria-labelledby="workflow-title">
+      <div class="workflow-intro"><h2 id="workflow-title" data-reveal>Make the PR your size</h2><p data-reveal>Start with the code that matters. Keep the file tree, filter out docs or tests, and move through the changes in your own order.</p><a class="text-link" href="#playground" data-action="filter-code" data-reveal>Try the code filter</a></div>
+      <figure class="native-fragment file-fragment" data-ui data-reveal><img src="assets/files.webp" width="660" height="480" loading="lazy" alt="Actual terminal file tree with code and test groups, line-change counts and per-file comment markers."><figcaption>Native file tree and change counts</figcaption></figure>
+      <figure class="native-fragment context-fragment" data-ui data-reveal><img src="assets/context.webp" width="1032" height="468" loading="lazy" alt="Actual terminal context queue containing questions attached to code from two different files."><figcaption>Two files. One question.</figcaption></figure>
+      <div class="context-copy"><h2 data-reveal>A senior beside the diff</h2><p data-reveal>You don’t need to know the whole codebase to ask a good question. Select a few lines, leave a private note, then do the same in another file.</p><p data-reveal>Claude receives the code and your notes with the next question. The conversation stays linked to the PR when you come back.</p><a class="text-link" href="#playground" data-action="note-demo" data-reveal>Ask about a selection</a></div>
+    </section>
+    <section class="tour" aria-labelledby="tour-title"><div class="wrap tour-top"><h2 id="tour-title" data-reveal>Watch a review unfold</h2><p data-reveal>From a large diff to a specific question, without leaving the keyboard.</p></div><div class="wrap"><video controls playsinline preload="none" poster="assets/workspace.webp" width="1920" height="1080" data-reveal><source src="assets/tour.mp4" type="video/mp4">Your browser does not support video. <a href="assets/tour.mp4">Download the tour.</a></video><p class="tour-caption">Actual terminal footage · synthetic PR and scripted replies · 88 seconds · no narration</p></div></section>
+    <section class="review-section wrap"><div><h2 data-reveal>GitHub keeps the review</h2><p data-reveal>Draft comments on the changed lines. Unfold them once more before you publish. Comment, approve or request changes through GitHub’s native review API.</p><p data-reveal>Private AI notes are a separate queue. They never become GitHub comments.</p></div><figure class="native-fragment" data-ui data-reveal><img src="assets/review.webp" width="1200" height="468" loading="lazy" alt="Actual terminal review screen with folded file comments and a compact publication summary."><figcaption>Your review, before it goes to GitHub</figcaption></figure></section>
+    <section id="questions" class="questions wrap" aria-labelledby="questions-title"><h2 id="questions-title" data-reveal>A few practical things</h2><div>
+      <details name="faq" data-reveal><summary>Does this replace GitHub reviews?</summary><p>GitHub remains the source of truth. LazyReview reads the PR and writes native pending comments, replies and review outcomes through GitHub’s APIs.</p></details>
+      <details name="faq" data-reveal><summary>Which AI account do I use?</summary><p>Your existing Claude Code login. The default Paper companion and embedded terminal use persistent native sessions. Codex and Grok are also supported in terminal mode.</p></details>
+      <details name="faq" data-reveal><summary>Where do my private notes go?</summary><p>To the companion as context for your next prompt, with their code and revision. They do not appear as typed messages. Delivered notes clear after a successful answer; failed or interrupted turns keep them.</p></details>
+      <details name="faq" data-reveal><summary>Does this browser demo use AI?</summary><p>No. It is an interactive sample with local state and scripted replies. It does not log in to GitHub, send code to a model or change a real review.</p></details>
+      <details name="faq" data-reveal><summary>What do I need to run it?</summary><p>Rust 1.88 or newer to build, Node.js 22.18 or newer at runtime, and GitHub CLI authentication. Install and sign in to your chosen AI CLI to use the companion. You can try it offline with ./lazyreview --demo.</p></details>
+      <details name="faq" data-reveal><summary>How mature is it?</summary><p>It is an early, MIT-licensed project. Local workflows and API contracts have automated coverage; live GitHub writes still need disposable-PR testing. Contributions and bug reports are welcome.</p></details>
+    </div></section>
+    <section id="install" class="install wrap"><h2 data-reveal>Bring it to your terminal</h2><p data-reveal>Build from source, sign in to GitHub, and choose a PR.</p><div class="install-command" data-reveal><pre><code>git clone https://github.com/FxmousKid/lazyreview.git
+cd lazyreview
+cargo build --release --locked --manifest-path tui/Cargo.toml
+gh auth login
+./lazyreview</code></pre><button type="button" id="copy-install">Copy commands</button></div><a class="button primary" href="https://github.com/FxmousKid/lazyreview" data-reveal>Open GitHub</a></section>
+  </main>
+  <footer class="wrap"><span>LazyReview, by <a href="https://iyan.nz">Iyan</a></span><a href="https://github.com/FxmousKid/lazyreview/blob/main/LICENSE">MIT license</a><a href="https://github.com/FxmousKid/lazyreview/issues">Report a bug</a></footer>
+  <dialog id="demo-dialog"><div class="dialog-top"><h2 id="dialog-title">Private question</h2><button type="button" id="dialog-close" aria-label="Close dialog">×</button></div><div id="dialog-body"></div></dialog>
+  <div class="notice" id="notice" role="status"></div>
+</body>
+</html>

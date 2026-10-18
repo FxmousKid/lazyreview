@@ -1,0 +1,14 @@
+/bin/
+/tui/target/
+/target/
+/node_modules/
+/dist/
+/.taste-skill/
+/outputs/
+__pycache__/
+.DS_Store
+.env*
+*.pem
+*.tsbuildinfo
+SOURCE_PATCH.json
+SOURCE_COMMIT

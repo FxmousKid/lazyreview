@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="A silent, interactive tour of LazyReview. Review a pull request, gather code from several files, and think it through with Claude.">
+  <title>Review your PRs · LazyReview</title>
+  <!-- DEMO_STYLE -->
+</head>
+<body>
+  <main class="demo" aria-label="LazyReview product demonstration">
+    <header class="masthead">
+      <a class="wordmark" href="#" id="home" aria-label="Restart LazyReview demo"><span class="mark" aria-hidden="true">⌘</span> lazyreview<span class="wordmark-dot" aria-hidden="true"></span></a>
+      <span class="edition">Two workflows. One PR.</span>
+    </header>
+    <section class="presentation" aria-labelledby="scene-title">
+      <div class="scene-heading">
+        <div class="eyebrow"><span id="chapter-number">01</span><span class="eyebrow-line" aria-hidden="true"></span><span id="chapter-label">The workspace</span></div>
+        <h1 id="scene-title">Review your PRs.</h1>
+        <p id="scene-caption">Less noise. More understanding.</p>
+      </div>
+      <div class="screen-shell">
+        <div class="window-bar" aria-hidden="true"><span class="window-dots"><i></i><i></i><i></i></span><span>review</span><span class="window-right">180 × 44</span></div>
+        <div class="viewport" id="viewport" aria-label="Native terminal demonstration" tabindex="0">
+          <div class="camera" id="camera"><pre id="terminal" aria-hidden="true"></pre></div>
+          <div class="focus-label" id="focus-label" hidden></div>
+          <div class="title-card" id="title-card" hidden><span id="card-chapter"></span><h2 id="card-title"></h2><p id="card-caption"></p></div>
+          <div class="key-overlay" id="key-overlay" aria-label="Recent keystrokes"><div id="key-sequence" class="key-sequence"></div></div>
+          <button class="replay-overlay" id="replay-overlay" hidden aria-label="Replay the demo"><span class="replay-glyph" aria-hidden="true">↻</span><span>One more look?</span><small>Replay the tour</small></button>
+          <div class="terminal-text" id="terminal-text"></div>
+        </div>
+        <div class="screen-footer"><span><span class="recording-dot" aria-hidden="true"></span>Native terminal · sample PR</span><button id="fit-camera" type="button" title="Toggle full workspace view" aria-pressed="false">Full workspace <span aria-hidden="true">↗</span></button></div>
+      </div>
+    </section>
+    <section class="playback" aria-label="Demo controls">
+      <div class="progress-row"><input type="range" id="scrubber" min="0" max="1000" value="0" step="1" aria-label="Demo timeline"><span id="elapsed">0:00</span><span class="time-divider">/</span><span id="duration">1:30</span></div>
+      <div class="control-row">
+        <div class="transport"><button id="play" class="play-button" type="button" aria-label="Play demo"><svg id="play-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.5 16 10 6 16.5Z"/></svg><span id="play-label">Play</span></button><button id="previous" class="icon-button" type="button" aria-label="Previous scene" title="Previous scene · ←"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 5-5 5 5 5"/></svg></button><button id="next" class="icon-button" type="button" aria-label="Next scene" title="Next scene · →"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 5 5 5-5 5"/></svg></button></div>
+        <nav id="chapters" class="chapters" aria-label="Demo chapters"></nav>
+        <button id="speed" class="speed-button" type="button" aria-label="Playback speed 1 times">1×</button>
+      </div>
+    </section>
+    <footer class="footer"><span><kbd>Space</kbd> play / pause <span aria-hidden="true">·</span> <kbd>←</kbd><kbd>→</kbd> scenes</span><span>Silent tour <span aria-hidden="true">/</span> <span id="scene-count"></span></span></footer>
+    <p id="error" role="alert" hidden></p>
+  </main>
+  <script id="demo-data" type="application/json"><!-- DEMO_DATA --></script>
+  <!-- DEMO_SCRIPT -->
+</body>
+</html>
