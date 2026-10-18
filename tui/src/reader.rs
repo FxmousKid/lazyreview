@@ -72,6 +72,7 @@ pub struct Reader {
 #[derive(Default)]
 struct Cache {
     key: u64,
+    render_revision: (u64, u64),
     width: u16,
     lines: Vec<Line<'static>>,
     offsets: Vec<usize>,
@@ -147,8 +148,6 @@ fn content_key(a: &App) -> u64 {
     let mut h = std::collections::hash_map::DefaultHasher::new();
     a.reader.appearance.hash(&mut h);
     a.syntax_palette.name().hash(&mut h);
-    crate::mermaid::revision().hash(&mut h);
-    crate::markdown::revision().hash(&mut h);
     format!("{:?}", a.panel).hash(&mut h);
     if a.panel == Panel::Threads {
         a.panel_cursor.hash(&mut h);
@@ -589,13 +588,19 @@ fn body(f: &mut Frame, a: &mut App, area: Rect) {
         column.width = READING_WIDTH;
     }
     let key = content_key(a);
-    if key != a.reader.cache.key || column.width != a.reader.cache.width {
+    let render_revision = (crate::mermaid::revision(), crate::markdown::revision());
+    if key != a.reader.cache.key
+        || column.width != a.reader.cache.width
+        || render_revision != a.reader.cache.render_revision
+    {
         let logical = a
             .reader
             .cache
             .offsets
             .partition_point(|offset| *offset <= a.panel_scroll)
             .saturating_sub(1);
+        // Background colors/diagrams invalidate rendering, not document identity.
+        // A completion between resize frames must still preserve the reading anchor.
         let resizing = key == a.reader.cache.key && column.width != a.reader.cache.width;
         let mut document = build(a, column.width);
         if appearance == Appearance::Studio {
@@ -624,6 +629,7 @@ fn body(f: &mut Frame, a: &mut App, area: Rect) {
         }
         a.reader.cache = Cache {
             key,
+            render_revision,
             width: column.width,
             lines: document.lines,
             offsets,
@@ -1323,6 +1329,23 @@ mod tests {
         key(&mut a, '[');
         key(&mut a, '[');
         assert!(a.panel_scroll < a.reader.sections[1].0);
+    }
+    #[test]
+    fn resize_preserves_heading_when_background_render_invalidates_the_cache() {
+        let mut a = sample();
+        a.panel = Panel::Overview;
+        draw(&mut a, 110, 26);
+        a.panel_scroll = a.reader.sections[1].0;
+        // Force a stale rendering revision without changing the PR or its text.
+        // This reproduces a syntax/diagram worker completing between frames.
+        a.reader.cache.render_revision = (u64::MAX, u64::MAX);
+        a.panes.right_width = 70;
+        draw(&mut a, 180, 26);
+        assert_eq!(
+            a.panel_scroll,
+            a.reader.sections[1].0.min(a.reader.max_scroll),
+            "A background completion must not move the selected heading on resize"
+        );
     }
     #[test]
     fn conversation_index_scope_and_artifacts_use_real_navigation_without_losing_position() {
