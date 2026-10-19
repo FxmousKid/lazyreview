@@ -57,11 +57,27 @@ impl Tour {
                 json!([r.x, top, r.width, height.min(44 - top)])
             })
         });
-        self.frames.push(json!({"id":format!("scene-{:02}",self.frames.len()+1),"chapter":chapter,"title":title,"caption":caption,"keys":keys,"duration":duration,"focus":focus,"html":preview::buffer_html(self.terminal.backend().buffer())}));
+        self.frames.push(json!({"id":format!("scene-{:02}",self.frames.len()+1),"chapter":chapter,"title":title,"caption":caption,"keys":keys,"duration":duration,"focus":focus,"html":preview::buffer_html_with_palette(self.terminal.backend().buffer(), &profile())}));
         Ok(())
     }
 }
+pub(crate) fn profile() -> Value {
+    serde_json::from_str(include_str!("../../demo/terminal-profile.json"))
+        .expect("valid pinned display profile")
+}
+pub(crate) fn apply_profile() {
+    // Pin display-only settings; never read or publish a local AI config/session.
+    let mut theme = crate::theme::Theme::blue();
+    theme.bg = ratatui::style::Color::Reset;
+    theme.add_bg = ratatui::style::Color::Reset;
+    theme.delete_bg = ratatui::style::Color::Reset;
+    theme.hunk_bg = ratatui::style::Color::Reset;
+    theme.name = "lazygit";
+    theme.apply(&profile()).expect("valid pinned Lazygit theme");
+    crate::theme::set(theme);
+}
 pub fn export(path: &str, bridge: &mut backend::Bridge, sample: Value) -> io::Result<()> {
+    apply_profile();
     let mut a = App::new(sample);
     preview::seed(&mut a, "ai");
     a.messages.clear();
@@ -300,7 +316,9 @@ pub fn export(path: &str, bridge: &mut backend::Bridge, sample: Value) -> io::Re
     )?;
     std::fs::write(
         path,
-        serde_json::to_string(&json!({"version":1,"cols":180,"rows":44,"frames":t.frames}))?,
+        serde_json::to_string(
+            &json!({"version":1,"cols":180,"rows":44,"terminalProfile":profile(),"frames":t.frames}),
+        )?,
     )?;
     Ok(())
 }

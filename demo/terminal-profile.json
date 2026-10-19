@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "name": "Local Alacritty \u00b7 Lazygit",
+  "terminal": "Alacritty 0.17.0",
+  "font": {
+    "family": "JetBrainsMono Nerd Font",
+    "sizePoints": 16,
+    "offset": {
+      "x": 0,
+      "y": 1
+    },
+    "faces": {
+      "regular": "JetBrainsMonoNerdFont-Regular.ttf",
+      "bold": "JetBrainsMonoNerdFont-Bold.ttf",
+      "italic": "JetBrainsMonoNerdFont-MediumItalic.ttf",
+      "boldItalic": "JetBrainsMonoNerdFont-Regular.ttf"
+    },
+    "sha256": {
+      "JetBrainsMonoNerdFont-MediumItalic.ttf": "93cea2a63565378cfaa5d4c12f88b637252c865183c4c2951d869d20e84398dd",
+      "JetBrainsMonoNerdFont-Bold.ttf": "e82e27a7f37c9a0a13cc4e417503a149c6a0280586930772d2ebed803159c864",
+      "JetBrainsMonoNerdFont-Regular.ttf": "0ec29a68b539ece7078fc714cebff0c0accb2f4948f8f7963d9f5e86633b12d9"
+    },
+    "boldItalicNote": "Configured Heavy Italic is absent locally; Alacritty falls back to Regular."
+  },
+  "raster": {
+    "scale": 2,
+    "fontSize": 32,
+    "cellWidth": 19,
+    "cellHeight": 44,
+    "baseline": 34,
+    "paddingX": 6,
+    "paddingY": 20
+  },
+  "window": {
+    "opacity": 0.7,
+    "blur": true,
+    "transparentBackgroundColors": true,
+    "decorations": "None",
+    "padding": {
+      "x": 3,
+      "y": 10
+    },
+    "dynamicPadding": true
+  },
+  "colors": {
+    "background": "#090300",
+    "foreground": "#a5a2a2",
+    "cursor": "#a5a2a2",
+    "selection": "#a5a2a2",
+    "ansi": [
+      "#090300",
+      "#db2d20",
+      "#01a252",
+      "#fded02",
+      "#01a0e4",
+      "#a16a94",
+      "#b5e4f4",
+      "#a5a2a2",
+      "#5c5855",
+      "#e8bbd0",
+      "#3a3432",
+      "#4a4543",
+      "#807d7c",
+      "#d6d5d4",
+      "#cdab53",
+      "#f7f7f7"
+    ]
+  },
+  "gui": {
+    "themePreset": "lazygit",
+    "companionStyle": "paper",
+    "syntaxTheme": "github-dark",
+    "theme": {
+      "activeBorderColor": [
+        "#a184df",
+        "bold"
+      ],
+      "inactiveBorderColor": [
+        "#636da6"
+      ],
+      "searchingActiveBorderColor": [
+        "#ff966c",
+        "bold"
+      ],
+      "optionsTextColor": [
+        "#82aaff"
+      ],
+      "selectedLineBgColor": [
+        "#2d3f76"
+      ],
+      "cherryPickedCommitFgColor": [
+        "#82aaff"
+      ],
+      "cherryPickedCommitBgColor": [
+        "#c099ff"
+      ],
+      "markedBaseCommitFgColor": [
+        "#82aaff"
+      ],
+      "markedBaseCommitBgColor": [
+        "#ffc777"
+      ],
+      "unstagedChangesColor": [
+        "#c53b53"
+      ],
+      "defaultFgColor": [
+        "#c8d3f5"
+      ]
+    }
+  },
+  "backdrop": "Portable matte uses the terminal background. Desktop wallpaper, macOS blur, GPU rasterization and Zellij chrome are not captured."
+}

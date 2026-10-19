@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, cp } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ATTRIBUTES = /^\s+style=(?:"([^"]*)"|'([^']*)')\s*$/;
@@ -54,19 +56,62 @@ export function validate(data) {
   return data;
 }
 
-export async function build(input = resolve(here, 'frames.json'), output = resolve(here, 'lazyreview-demo.html')) {
-  const [template, css, js, raw] = await Promise.all([
-    readFile(resolve(here, 'index.html'), 'utf8'), readFile(resolve(here, 'style.css'), 'utf8'),
-    readFile(resolve(here, 'player.js'), 'utf8'), readFile(input, 'utf8'),
-  ]);
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+const serialize = value => JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+
+export async function nativePresentation(input, nativeDir = resolve(dirname(input), 'native'), embed = false) {
+  const raw = await readFile(input);
   const data = presentation(JSON.parse(raw));
-  const serialized = JSON.stringify(data).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const profileBytes = await readFile(resolve(here, 'terminal-profile.json'));
+  const profile = JSON.parse(profileBytes);
+  const manifest = JSON.parse(await readFile(resolve(nativeDir, 'manifest.json'), 'utf8'));
+  if (manifest.framesSha256 !== sha256(raw) || manifest.profileSha256 !== sha256(profileBytes) ||
+      !isDeepStrictEqual(data.terminalProfile, profile)) throw Error('Native images are stale. Re-export frames and render --native-images demo/native.');
+  const r = profile.raster;
+  if (manifest.width !== data.cols * r.cellWidth || manifest.height !== data.rows * r.cellHeight || manifest.scale !== r.scale) throw Error('Native image geometry does not match the terminal profile.');
+  const frames = await Promise.all(data.frames.map(async frame => {
+    const entry = manifest.images[frame.id];
+    if (!entry || entry.file !== `${frame.id}.webp`) throw Error('Missing native image: ' + frame.id);
+    const bytes = await readFile(resolve(nativeDir, entry.file));
+    if (sha256(bytes) !== entry.sha256) throw Error('Native image changed: ' + frame.id);
+    return {...frame, image: embed ? 'data:image/webp;base64,' + bytes.toString('base64') : `native/${entry.file}`};
+  }));
+  return {...data, nativeImages: {width: manifest.width, height: manifest.height, scale: manifest.scale}, frames};
+}
+
+export async function build(input = resolve(here, 'frames.json'), output = resolve(here, 'lazyreview-demo.html'), nativeDir) {
+  const [template, css, js, data] = await Promise.all([
+    readFile(resolve(here, 'index.html'), 'utf8'), readFile(resolve(here, 'style.css'), 'utf8'),
+    readFile(resolve(here, 'player.js'), 'utf8'), nativePresentation(input, nativeDir, true),
+  ]);
   const html = template.replace('<!-- DEMO_STYLE -->', `<style>\n${css}\n</style>`)
-    .replace('<!-- DEMO_DATA -->', () => serialized)
-    .replace('<!-- DEMO_SCRIPT -->', `<script>\n${js}\n</script>`);
+    .replace('<!-- DEMO_DATA -->', () => serialize(data))
+    .replace('<!-- DEMO_SCRIPT -->', `<script>\n${js}\n</script>`)
+    .replace('src="../../assets/workspace.webp"', `src="${(data.frames.find(frame=>frame.kind!=='card') || data.frames[0]).image}"`);
   await writeFile(output, html);
   return { output, frames: data.frames.length, durationSeconds: data.frames.reduce((n, frame) => n + frame.duration, 0) / 1000, bytes: Buffer.byteLength(html) };
 }
+
+// Hosted variant uses external scripts under the site's existing strict CSP.
+export async function buildHosted(output) {
+  await mkdir(output, {recursive:true});
+  const data = await nativePresentation(resolve(here, 'frames.json'));
+  let template = await readFile(resolve(here, 'index.html'), 'utf8');
+  template = template.replace(/  <meta http-equiv="Content-Security-Policy"[^>]*>\n/, '')
+    .replace('<!-- DEMO_STYLE -->', '<link rel="stylesheet" href="style.css">')
+    .replace(/  <script id="demo-data"[^>]*>.*?<\/script>\n/, '')
+    .replace('<!-- DEMO_SCRIPT -->', '<script src="data.js"></script><script src="player.js"></script>');
+  await Promise.all([
+    writeFile(resolve(output, 'index.html'), template),
+    writeFile(resolve(output, 'data.js'), 'window.LR_TUI_DATA=' + serialize(data) + ';\n'),
+    cp(resolve(here, 'style.css'), resolve(output, 'style.css')),
+    cp(resolve(here, 'player.js'), resolve(output, 'player.js')),
+    cp(resolve(here, 'native'), resolve(output, 'native'), {recursive:true}),
+    cp(resolve(here, 'terminal-profile.json'), resolve(output, 'terminal-profile.json')),
+    mkdir(resolve(output, 'fonts'), {recursive:true}).then(() => cp(resolve(here, 'fonts/OFL.txt'), resolve(output, 'fonts/OFL.txt'))),
+  ]);
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv[2] === '--timeline') {
     console.log(JSON.stringify(presentation(JSON.parse(await readFile(resolve(process.argv[3] || resolve(here, 'frames.json')), 'utf8')))));

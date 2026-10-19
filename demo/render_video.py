@@ -23,21 +23,25 @@ import unicodedata
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).resolve().parent
-FONT_ROOT = Path.home() / "Library/Fonts"
-MONO = FONT_ROOT / "JetBrainsMono-Regular.ttf"
-MONO_BOLD = FONT_ROOT / "JetBrainsMono-Bold.ttf"
-NERD = FONT_ROOT / "JetBrainsMonoNerdFontMono-Regular.ttf"
-SANS = Path("/System/Library/Fonts/SFNS.ttf")
+PROFILE = json.loads((HERE / "terminal-profile.json").read_text())
+FONT_ROOT = HERE / "fonts"
+MONO = FONT_ROOT / PROFILE["font"]["faces"]["regular"]
+MONO_BOLD = FONT_ROOT / PROFILE["font"]["faces"]["bold"]
+ITALIC = FONT_ROOT / PROFILE["font"]["faces"]["italic"]
+BOLD_ITALIC = FONT_ROOT / PROFILE["font"]["faces"]["boldItalic"]
+SANS = HERE.parent / "site/assets/bricolage-400.ttf"
 SYMBOL_FONT = Path("/System/Library/Fonts/Apple Symbols.ttf")
 UNICODE_FONT = Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf")
 BG = "#090c10"
-SURFACE = "#0d1117"
-TEXT = "#e6edf3"
+SURFACE = PROFILE["colors"]["background"]
+TEXT = "#c8d3f5"
 MUTED = "#93a2b7"
-ACCENT = "#a5c9ff"
+ACCENT = "#a184df"
 WIDTH, HEIGHT = 1920, 1080
 STAGE = (80, 234, 1760, 676)
-FONT_SIZE, LINE_HEIGHT = 20, 26
+FONT_SIZE = PROFILE["raster"]["fontSize"]
+LINE_HEIGHT = PROFILE["raster"]["cellHeight"]
+
 
 
 class NativeMarkup(HTMLParser):
@@ -177,7 +181,9 @@ class Renderer:
         self.data = data
         self.mono = font(MONO, FONT_SIZE)
         self.bold = font(MONO_BOLD, FONT_SIZE)
-        self.nerd = font(NERD, FONT_SIZE)
+        self.nerd = self.mono
+        self.italic = font(ITALIC, FONT_SIZE)
+        self.bold_italic = font(BOLD_ITALIC, FONT_SIZE)
         self.symbols = font(SYMBOL_FONT, FONT_SIZE)
         self.unicode = font(UNICODE_FONT, FONT_SIZE)
         missing_symbol = self.symbols.getmask("\uffff")
@@ -187,7 +193,9 @@ class Renderer:
         self.glyph_fallback = {}
         self.ui = {size: font(SANS, size) for size in (12, 14, 16, 18, 20, 21, 23, 26, 28, 38, 48, 62)}
         self.keyfont = font(MONO, 48)
-        self.cell = round(self.mono.getlength("M"))
+        self.cell = PROFILE["raster"]["cellWidth"]
+        self.padding_x = PROFILE["raster"]["paddingX"]
+        self.padding_y = PROFILE["raster"]["paddingY"]
         self.native_width, self.native_height = self.cell * data["cols"], LINE_HEIGHT * data["rows"]
         self.cache = OrderedDict()
         self.chrome = self.base_chrome()
@@ -199,9 +207,7 @@ class Renderer:
         text(draw, (1840, 59), "Two workflows. One PR.", self.ui[14], "#718094", "ra")
         roundrect(draw, (79, 201, 1841, 941), "#12171e", "#323c4b", 11)
         draw.rectangle((80, 233, 1840, 911), fill=SURFACE)
-        for x, color in [(100, "#97636c"), (115, "#9b8a63"), (130, "#628e7b")]:
-            draw.ellipse((x, 214, x + 7, 221), fill=color)
-        text(draw, (960, 218), "review", self.ui[12], "#7f8b9d", "mm")
+        text(draw, (100, 218), "Alacritty · JetBrainsMono Nerd Font · 16pt", self.ui[12], "#7f8b9d", "lm")
         text(draw, (1819, 218), f'{self.data["cols"]} × {self.data["rows"]}', self.ui[12], "#7f8b9d", "rm")
         draw.line((80, 233, 1840, 233), "#242d3b")
         draw.line((80, 911, 1840, 911), "#242d3b")
@@ -217,8 +223,12 @@ class Renderer:
         parser.feed(self.data["frames"][index]["html"])
         if parser.stack:
             raise ValueError("Unbalanced terminal markup")
-        image = Image.new("RGB", (self.native_width, self.native_height), SURFACE)
+        # Background opacity never fades the text. Keep terminal cell origins fixed,
+        # including Nerd Font symbols whose natural advance can exceed one cell.
+        opacity = round(255 * PROFILE["window"]["opacity"])
+        image = Image.new("RGBA", (self.native_width, self.native_height), (*rgb(SURFACE), opacity))
         draw = ImageDraw.Draw(image)
+        cells = []
         col = row = 0
         for content, style in parser.runs:
             for char in content:
@@ -231,27 +241,30 @@ class Renderer:
                     break
                 if col < self.data["cols"]:
                     x, y = col * self.cell, row * LINE_HEIGHT
+                    cells.append((char, style, x, y, width))
                     if width:
-                        draw.rectangle((x, y, x + self.cell * width - 1, y + LINE_HEIGHT - 1), fill=style["background"])
-                    face = self.nerd if ord(char) > 127 else self.bold if style.get("font-weight") == "700" else self.mono
-                    # A fixed cell origin preserves alignment and terminal gutters.
-                    if ord(char) > 127:
-                        if char not in self.glyph_fallback:
-                            glyph_mask = self.nerd.getmask(char)
-                            self.glyph_fallback[char] = (glyph_mask.size, bytes(glyph_mask)) == self.missing_glyph
-                        if self.glyph_fallback[char]:
-                            symbol_mask = self.symbols.getmask(char)
-                            fallback = self.unicode if (symbol_mask.size, bytes(symbol_mask)) == self.missing_symbol else self.symbols
-                            bounds = fallback.getbbox(char)
-                            glyph_width, glyph_height = bounds[2] - bounds[0], bounds[3] - bounds[1]
-                            text(draw, (x + (self.cell * max(1, width) - glyph_width) / 2 - bounds[0], y + (LINE_HEIGHT - glyph_height) / 2 - bounds[1]), char, fallback, style["color"])
-                        else:
-                            text(draw, (x, y), char, face, style["color"])
-                    else:
-                        text(draw, (x, y), char, face, style["color"])
-                    if style.get("text-decoration") == "underline":
-                        draw.line((x, y + 24, x + width * self.cell, y + 24), style["color"])
+                        draw.rectangle((x, y, x + self.cell * width - 1, y + LINE_HEIGHT - 1), fill=(*rgb(style["background"]), opacity))
                 col += width
+        for char, style, x, y, width in cells:
+            bold, italic = style.get("font-weight") == "700", style.get("font-style") == "italic"
+            face = self.bold_italic if bold and italic else self.italic if italic else self.bold if bold else self.mono
+            glyph_key = (str(face.path), char)
+            if glyph_key not in self.glyph_fallback:
+                mask, missing = face.getmask(char), face.getmask("\uffff")
+                self.glyph_fallback[glyph_key] = bool(char.strip()) and (mask.size, bytes(mask)) == (missing.size, bytes(missing))
+            if self.glyph_fallback[glyph_key]:
+                # Alacritty also cascades to macOS symbol fonts for absent glyphs.
+                fallback = self.symbols
+                candidate = fallback.getmask(char)
+                if (candidate.size, bytes(candidate)) == self.missing_symbol:
+                    fallback = self.unicode
+                bounds = fallback.getbbox(char)
+                glyph_width, glyph_height = bounds[2] - bounds[0], bounds[3] - bounds[1]
+                text(draw, (x + (self.cell * max(1, width) - glyph_width) / 2 - bounds[0], y + (LINE_HEIGHT - glyph_height) / 2 - bounds[1]), char, fallback, style["color"])
+            else:
+                text(draw, (x, y + PROFILE["raster"]["baseline"]), char, face, style["color"], "ls")
+            if style.get("text-decoration") == "underline":
+                draw.line((x, y + LINE_HEIGHT - 4, x + width * self.cell - 1, y + LINE_HEIGHT - 4), style["color"], width=2)
         self.cache[index] = image
         while len(self.cache) > 4:
             self.cache.popitem(last=False)
@@ -284,7 +297,9 @@ class Renderer:
         draw = ImageDraw.Draw(image)
         text(draw, (WIDTH / 2, 128), frame["title"], self.ui[38], TEXT, "mm")
         text(draw, (WIDTH / 2, 174), frame["caption"], self.ui[23], MUTED, "mm")
-        native = self.native(index)
+        source = self.native(index)
+        native = Image.new("RGB", source.size, SURFACE)
+        native.paste(source, (0, 0), source)
         target = camera(frame, self.data["cols"], self.data["rows"], self.native_width, self.native_height)
         previous = target if prior.get("kind") == "card" else camera(prior, self.data["cols"], self.data["rows"], self.native_width, self.native_height)
         fraction = ease_in_out(min(1, within / 720))
@@ -344,6 +359,7 @@ def main():
     parser.add_argument("--output", type=Path, default=HERE / "lazyreview-demo.mp4")
     parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--contact-sheet", type=Path)
+    parser.add_argument("--native-images", type=Path, help="Write exact cell images and their provenance manifest for the browser tour")
     parser.add_argument("--stills-only", action="store_true", help="Inspect recorded frames without encoding video")
     args = parser.parse_args()
     if not 1 <= args.fps <= 60:
@@ -352,7 +368,24 @@ def main():
     # No browser, key logger, provider process, or network is involved.
     compiled = subprocess.run(["node", str(HERE / "build.mjs"), "--timeline", str(args.frames.resolve())], check=True, capture_output=True, text=True)
     data = validate(json.loads(compiled.stdout))
+    import hashlib
+    for name, digest in PROFILE["font"]["sha256"].items():
+        if hashlib.sha256((FONT_ROOT / name).read_bytes()).hexdigest() != digest:
+            raise ValueError(f"Pinned local font changed: {name}")
+    if data.get("terminalProfile") != PROFILE:
+        raise ValueError("Native frames must be re-exported with the pinned terminal profile")
     renderer = Renderer(data)
+    if args.native_images:
+        args.native_images.mkdir(parents=True, exist_ok=True)
+        manifest = {"version": 1, "width": renderer.native_width, "height": renderer.native_height,
+                    "scale": PROFILE["raster"]["scale"],
+                    "framesSha256": hashlib.sha256(args.frames.read_bytes()).hexdigest(),
+                    "profileSha256": hashlib.sha256((HERE / "terminal-profile.json").read_bytes()).hexdigest(), "images": {}}
+        for i, frame in enumerate(data["frames"]):
+            target = args.native_images / (frame["id"] + ".webp")
+            renderer.native(i).save(target, lossless=True, method=6)
+            manifest["images"][frame["id"]] = {"file": target.name, "sha256": hashlib.sha256(target.read_bytes()).hexdigest()}
+        (args.native_images / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     starts, total = [], 0
     for frame in data["frames"]:
         starts.append(total)

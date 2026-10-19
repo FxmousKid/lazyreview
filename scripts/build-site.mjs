@@ -1,6 +1,7 @@
 import {cp,mkdir,rm,writeFile,stat,readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {join,extname,basename} from 'node:path';
+import {buildHosted} from '../demo/build.mjs';
 import {sample} from '../lib/sample.ts';
 import {parsePatch,categorize} from '../lib/review.ts';
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -15,6 +16,7 @@ export async function buildSite(){
  const workbench=(await readFile(join(root,'site/partials/workbench.html'),'utf8')).replaceAll('src="assets/','src="../assets/');
  if(template.split('<!-- WORKBENCH -->').length!==2)throw Error('Demo template must contain exactly one workspace');
  await writeFile(join(out,'demo/index.html'),template.replace('<!-- WORKBENCH -->',workbench));
+ await buildHosted(join(out,'demo/tui'));
  await cp(join(root,'demo/lazyreview-demo.mp4'),join(out,'assets/tour.mp4'));
  return out;
 }

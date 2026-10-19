@@ -231,22 +231,33 @@ pub(crate) fn render_settled(
     }
 }
 
-/// Actual buffer cells, shared by the layout gallery and the product tour.
+#[cfg(test)]
 pub fn buffer_html(buffer: &ratatui::buffer::Buffer) -> String {
+    buffer_html_with_palette(buffer, &Value::Null)
+}
+
+/// Terminal defaults are resolved separately from the application's truecolor theme.
+pub fn buffer_html_with_palette(buffer: &ratatui::buffer::Buffer, profile: &Value) -> String {
+    let resolve = |c, foreground| terminal_color(c, foreground, profile);
     let mut html = String::new();
     for y in buffer.area.y..buffer.area.bottom() {
         let mut x = buffer.area.x;
         while x < buffer.area.right() {
             let cell = &buffer[(x, y)];
-            let (mut fg, mut bg) = (cell.fg, cell.bg);
+            let (mut fg, mut bg) = (resolve(cell.fg, true), resolve(cell.bg, false));
             if cell.modifier.contains(Modifier::REVERSED) {
                 std::mem::swap(&mut fg, &mut bg);
             }
-            let extra = if cell.modifier.contains(Modifier::BOLD) {
-                "font-weight:700;"
-            } else {
-                ""
-            };
+            let mut extra = String::new();
+            for (modifier, css) in [
+                (Modifier::BOLD, "font-weight:700;"),
+                (Modifier::ITALIC, "font-style:italic;"),
+                (Modifier::UNDERLINED, "text-decoration:underline;"),
+            ] {
+                if cell.modifier.contains(modifier) {
+                    extra.push_str(css);
+                }
+            }
             let mut content = String::new();
             loop {
                 let current = &buffer[(x, y)];
@@ -262,8 +273,8 @@ pub fn buffer_html(buffer: &ratatui::buffer::Buffer) -> String {
             }
             html.push_str(&format!(
                 "<span style='color:{};background:{};{}'>{}</span>",
-                color(fg, true),
-                color(bg, false),
+                fg,
+                bg,
                 extra,
                 escape(&content)
             ));
@@ -271,4 +282,69 @@ pub fn buffer_html(buffer: &ratatui::buffer::Buffer) -> String {
         html.push('\n');
     }
     html
+}
+
+fn terminal_color(c: Color, foreground: bool, profile: &Value) -> String {
+    let colors = &profile["colors"];
+    let index = match c {
+        Color::Indexed(i) if i < 16 => Some(i as usize),
+        Color::Black => Some(0),
+        Color::Red => Some(1),
+        Color::Green => Some(2),
+        Color::Yellow => Some(3),
+        Color::Blue => Some(4),
+        Color::Magenta => Some(5),
+        Color::Cyan => Some(6),
+        Color::Gray => Some(7),
+        Color::DarkGray => Some(8),
+        Color::LightRed => Some(9),
+        Color::LightGreen => Some(10),
+        Color::LightYellow => Some(11),
+        Color::LightBlue => Some(12),
+        Color::LightMagenta => Some(13),
+        Color::LightCyan => Some(14),
+        Color::White => Some(15),
+        _ => None,
+    };
+    let value = if c == Color::Reset {
+        &colors[if foreground {
+            "foreground"
+        } else {
+            "background"
+        }]
+    } else if let Some(i) = index {
+        &colors["ansi"][i]
+    } else {
+        &Value::Null
+    };
+    value
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| color(c, foreground))
+}
+
+#[cfg(test)]
+mod terminal_profile_tests {
+    use super::*;
+    #[test]
+    fn defaults_ansi_truecolor_and_reversed_cells_keep_their_meaning() {
+        let profile: Value =
+            serde_json::from_str(include_str!("../../demo/terminal-profile.json")).unwrap();
+        assert_eq!(terminal_color(Color::Reset, false, &profile), "#090300");
+        assert_eq!(terminal_color(Color::Reset, true, &profile), "#a5a2a2");
+        assert_eq!(terminal_color(Color::Indexed(1), true, &profile), "#db2d20");
+        assert_eq!(terminal_color(Color::LightCyan, true, &profile), "#cdab53");
+        assert_eq!(
+            terminal_color(Color::Rgb(13, 17, 23), false, &profile),
+            "#0d1117"
+        );
+        let mut b = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, 1, 1));
+        b[(0, 0)].set_symbol("x").set_style(
+            ratatui::style::Style::default()
+                .add_modifier(Modifier::REVERSED | Modifier::ITALIC | Modifier::UNDERLINED),
+        );
+        let html = buffer_html_with_palette(&b, &profile);
+        assert!(html.contains("color:#090300;background:#a5a2a2;"));
+        assert!(html.contains("font-style:italic;text-decoration:underline;"));
+    }
 }

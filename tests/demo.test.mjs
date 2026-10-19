@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, cp } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validate, build, presentation, keycast } from '../demo/build.mjs';
+import { validate, build, presentation, keycast, nativePresentation } from '../demo/build.mjs';
 const frame = { id: 'start', title: 'Review your PRs.', caption: 'A real terminal.', chapter: 'Review', keys: ['g', 'a'], duration: 6000, focus: [0, 0, 80, 30], html: "<pre><span style='color:#e6edf3;background:#0d1117;font-weight:700;'>Review &lt;code&gt;</span>\n</pre>" };
 const fixture = (patch = {}) => ({ version: 1, cols: 180, rows: 44, frames: [{ ...frame, ...patch }] });
 test('accepts native terminal spans and bounded focus cells', () => assert.equal(validate(fixture()).frames[0].id, 'start'));
@@ -23,10 +24,18 @@ test('builds a portable page with inert embedded source data', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'rw-demo-'));
   try {
     const input = join(dir, 'frames.json'), output = join(dir, 'demo.html');
-    await writeFile(input, JSON.stringify(fixture({ caption: '</script><script>alert(1)</script>' })));
+    const recorded = JSON.parse(await readFile(new URL('../demo/frames.json', import.meta.url), 'utf8'));
+    const data = {...recorded, frames:[{...recorded.frames[0], caption: '</script><script>alert(1)</script>'}]};
+    const raw = JSON.stringify(data);
+    await writeFile(input, raw);
+    await cp(new URL('../demo/native', import.meta.url), join(dir,'native'), {recursive:true});
+    const manifestPath = join(dir,'native/manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath,'utf8'));
+    manifest.framesSha256 = createHash('sha256').update(raw).digest('hex');
+    await writeFile(manifestPath, JSON.stringify(manifest));
     const result = await build(input, output);
     const html = await readFile(output, 'utf8');
-    assert.equal(result.frames, 1); assert.equal(result.durationSeconds, 6);
+    assert.equal(result.frames, 1); assert.equal(result.durationSeconds, 4);
     assert.ok(!html.includes('<!-- DEMO_'));
     assert.ok(html.includes('\\u003c/script>'));
     assert.ok(!html.includes('<script>alert(1)</script>'));
@@ -83,4 +92,30 @@ test('keystroke labels preserve chord identity and fit short scenes', () => {
   const data = presentation(fixture());
   assert.deepEqual(data.frames[0].keycast, keycast(frame));
   assert.equal(data.frames[0].html, frame.html);
+});
+
+
+test('native playback pins local fonts and geometry and refuses stale raster assets', async () => {
+  const input = new URL('../demo/frames.json', import.meta.url);
+  const data = await nativePresentation(input.pathname);
+  const p = data.terminalProfile;
+  assert.equal(p.font.family, 'JetBrainsMono Nerd Font');
+  assert.equal(p.font.sizePoints, 16);
+  assert.equal(p.colors.background, '#090300');
+  assert.equal(p.window.opacity, 0.7);
+  assert.equal(p.gui.theme.activeBorderColor[0], '#a184df');
+  assert.equal(data.nativeImages.width, data.cols * p.raster.cellWidth);
+  for (const [name, hash] of Object.entries(p.font.sha256)) {
+    const bytes = await readFile(new URL('../demo/fonts/' + name, import.meta.url));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), hash);
+  }
+  const dir = await mkdtemp(join(tmpdir(),'lr-native-provenance-'));
+  try {
+    await writeFile(join(dir,'frames.json'), JSON.stringify({...data, frames:data.frames.slice(1)}));
+    await cp(new URL('../demo/native',import.meta.url),join(dir,'native'),{recursive:true});
+    await assert.rejects(nativePresentation(join(dir,'frames.json')), /stale/);
+    await cp(input,join(dir,'frames.json'));
+    await writeFile(join(dir,'native/scene-01.webp'),'changed');
+    await assert.rejects(nativePresentation(join(dir,'frames.json')), /image changed/);
+  } finally { await rm(dir,{recursive:true,force:true}); }
 });

@@ -35,9 +35,40 @@ try{
   const homeUrl=url;
   await cdp('Page.navigate',{url:homeUrl});
   await wait(400);
-  assert.equal(await evaluate('document.querySelector("#try-review").getAttribute("href")'),'demo/');
+  assert.equal(await evaluate('document.querySelector("#try-review").getAttribute("href")'),'demo/tui/');
   assert.equal(await evaluate('document.querySelector(".sim")'),null);
-  assert.equal(await evaluate('document.querySelector(".demo-poster").getAttribute("href")'),'demo/');
+  assert.equal(await evaluate('document.querySelector(".demo-poster").getAttribute("href")'),'demo/tui/');
+  const nativeUrl=new URL('demo/tui/',homeUrl).href;
+  await cdp('Page.navigate',{url:nativeUrl});
+  for(let i=0;i<100;i++){if(await evaluate('!!window.reviewDemo && window.reviewDemo.getState().imageReady'))break;await wait(50);}
+  assert.ok(await evaluate('window.reviewDemo.getState().imageReady'));
+  assert.equal(await evaluate('window.LR_TUI_DATA.terminalProfile.font.family'),'JetBrainsMono Nerd Font');
+  assert.equal(await evaluate('window.LR_TUI_DATA.terminalProfile.font.sizePoints'),16);
+  assert.equal(await evaluate('window.LR_TUI_DATA.terminalProfile.window.opacity'),0.7);
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".viewport")).backgroundColor'),'rgb(9, 3, 0)');
+  assert.equal(await evaluate('document.querySelector(".window-dots")'),null);
+  assert.equal(await evaluate('window.reviewDemo.getState().playing'),false);
+  await evaluate('window.reviewDemo.seek(4.2)');await wait(100);
+  assert.equal(await evaluate('[...document.querySelectorAll("#key-sequence kbd")].length'),0);
+  await click('#play');await wait(120);assert.equal(await evaluate('window.reviewDemo.getState().playing'),true);await click('#play');
+  await click('#next');assert.equal(await evaluate('window.reviewDemo.getState().index'),2);
+  await evaluate('window.reviewDemo.seek(9.7)');
+  assert.deepEqual(await evaluate('[...document.querySelectorAll("#key-sequence kbd")].map(e=>e.textContent)'),['2']);
+  await click('#actual-size');
+  assert.equal(await evaluate('window.reviewDemo.getState().actualSize'),true);
+  assert.equal(await evaluate('document.querySelector("#terminal-image").getBoundingClientRect().width'),1710);
+  assert.ok(await evaluate('document.querySelector(".viewport").scrollWidth>document.querySelector(".viewport").clientWidth'));
+  await click('#actual-size');
+  await mkdir(new URL('../outputs/',import.meta.url),{recursive:true});
+  for(const width of [1440,768,390]){
+    await viewport(width,width<600?844:1000);await evaluate('window.scrollTo({top:0,behavior:"instant"});window.reviewDemo.seek(74)');await wait(400);
+    assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'),`Native demo overflows at ${width}`);
+    assert.ok(await evaluate('window.reviewDemo.getState().imageReady'));
+    const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(new URL(`../outputs/tui-${width}.png`,import.meta.url),Buffer.from(shot.data,'base64'));
+  }
+  await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+  await evaluate('window.reviewDemo.seek(30)');assert.equal(await evaluate('document.querySelector("#camera").style.transition'),'none');
+  await cdp('Emulation.setEmulatedMedia',{features:[]});await viewport(1440,900);
   url=new URL('demo/',homeUrl).href;
   await cdp('Page.navigate',{url});
   for(let i=0;i<100;i++){if(await evaluate('!!window.LR_SAMPLE && document.querySelector(".sim")?.hidden===false'))break;await wait(50);}
@@ -80,7 +111,7 @@ try{
   assert.equal(await evaluate('document.querySelector(".sim").hidden'),true);
   assert.ok(await evaluate('document.querySelector(".fallback-workspace").naturalWidth>0'));
   assert.deepEqual(errors,[]);assert.ok(requests.every(u=>u.startsWith(new URL(url).origin)||u.startsWith('data:')),'Unexpected external request');
-  console.log('PASS standalone /demo/: real Chrome, showcase links, 18 files, direct entry, full viewport, keyboard focus, filters, multi-file notes, escaping, scripted replies, Ctrl-], drafts, keyboard scope, mobile, reduced motion, no-JS fallback; no external requests.');
+  console.log('PASS native /demo/tui/: pinned display profile, authentic cell images, playback, KeyCastr, actual-size pan, reduced motion and responsive layouts. PASS standalone /demo/: real Chrome, showcase links, 18 files, direct entry, full viewport, keyboard focus, filters, multi-file notes, escaping, scripted replies, Ctrl-], drafts, keyboard scope, mobile, reduced motion, no-JS fallback; no external requests.');
 }finally{
   if(ws?.readyState===WebSocket.OPEN){try{await send('Browser.close');}catch{}ws.close();}
   browser?.kill();server?.kill();await wait(250);await rm(profile,{recursive:true,force:true});

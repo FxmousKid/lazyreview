@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const data = JSON.parse($('demo-data').textContent);
+  const data = window.LR_TUI_DATA || JSON.parse($('demo-data').textContent);
   const frames = data.frames;
   if (!Array.isArray(frames) || !frames.length) {
     $('error').hidden = false;
@@ -12,9 +12,16 @@
   const starts = []; let total = 0;
   for (const frame of frames) { starts.push(total); total += frame.duration; }
   let time = 0, index = -1, playing = false, rate = 1, lastTick = null;
-  let fullView = false, frameRequest = null;
+  let fullView = false, actualSize = false, frameRequest = null;
   const speeds = [1, 1.5, 2, .75];
-  const camera = $('camera'), terminal = $('terminal'), viewport = $('viewport');
+  const camera = $('camera'), terminal = $('terminal'), viewport = $('viewport'), image = $('terminal-image');
+  const raster = data.nativeImages;
+  if (!raster) throw new Error('Rebuild native images before building the TUI player.');
+  image.style.width = `${raster.width / raster.scale}px`;
+  image.style.height = `${raster.height / raster.scale}px`;
+  // Preload recorded cells, never a provider or GitHub endpoint.
+  for (const frame of frames) { const preload = new Image(); preload.src = frame.image; }
+
   const chapters = [];
   frames.forEach((frame, i) => {
     const title = frame.chapter || 'The workspace';
@@ -34,18 +41,25 @@
   function setCamera(instant = false) {
     const frame = frames[index]; if (!frame) return;
     const width = viewport.clientWidth, height = viewport.clientHeight;
-    const rawWidth = terminal.offsetWidth, rawHeight = data.rows * 18;
+    if (actualSize) {
+      camera.style.transition = 'none'; camera.style.transform = 'none';
+      const focus = frame.focus || [0, 0, data.cols, data.rows];
+      viewport.scrollTo({left: Math.max(0, (focus[0] + focus[2]/2) * raster.width/raster.scale/data.cols - width/2), top: Math.max(0, (focus[1] + focus[3]/2) * raster.height/raster.scale/data.rows - height/2), behavior:'instant'});
+      return;
+    }
+    const rawWidth = raster.width / raster.scale + 6, rawHeight = raster.height / raster.scale + 20;
+    const line = raster.height / raster.scale / data.rows;
     if (!width || !height || !rawWidth) return;
     const fit = Math.min(width / rawWidth, height / rawHeight);
     const focus = frame.focus && !fullView && !reducedMotion.matches ? frame.focus : null;
     let scale = fit, x = (width - rawWidth * fit) / 2, y = (height - rawHeight * fit) / 2;
     if (focus) {
-      const unit = rawWidth / data.cols;
+      const unit = raster.width / raster.scale / data.cols;
       const [fx, fy, fw, fh] = focus;
-      scale = Math.min(width / ((fw + 6) * unit), height / ((fh + 3) * 18), fit * 2.6);
+      scale = Math.min(width / ((fw + 6) * unit), height / ((fh + 3) * line), fit * 2.6);
       scale = Math.max(scale, fit);
       x = width / 2 - (fx + fw / 2) * unit * scale;
-      y = height / 2 - (fy + fh / 2) * 18 * scale;
+      y = height / 2 - (fy + fh / 2) * line * scale;
       x = Math.max(width - rawWidth * scale, Math.min(0, x));
       y = rawHeight * scale <= height ? (height - rawHeight * scale) / 2 : Math.max(height - rawHeight * scale, Math.min(0, y));
       if (fy <= 2) y = 0;
@@ -58,6 +72,7 @@
   function showFrame(next, instant) {
     index = next; const frame = frames[index];
     terminal.innerHTML = frame.html.replace(/^\s*<pre(?:\s[^>]*)?>/i, '').replace(/<\/pre>\s*$/i, '');
+    image.src = frame.image;
     $('terminal-text').textContent = terminal.textContent;
     const card = frame.kind === 'card';
     document.querySelector('.presentation').classList.toggle('is-card', card);
@@ -149,6 +164,12 @@
   $('home').addEventListener('click', event => { event.preventDefault(); seek(0); setPlaying(false); });
   $('scrubber').addEventListener('input', () => seek(Number($('scrubber').value) / 1000 * total));
   $('speed').addEventListener('click', () => { rate = speeds[(speeds.indexOf(rate) + 1) % speeds.length]; $('speed').textContent = `${rate}×`; $('speed').setAttribute('aria-label', `Playback speed ${rate} times`); });
+  $('actual-size').addEventListener('click', () => {
+    actualSize = !actualSize;
+    $('actual-size').setAttribute('aria-pressed', String(actualSize));
+    viewport.classList.toggle('actual-size', actualSize);
+    viewport.scrollTo(0, 0); setCamera(true);
+  });
   $('fit-camera').addEventListener('click', () => { fullView = !fullView; $('fit-camera').setAttribute('aria-pressed', String(fullView)); setCamera(true); });
   document.addEventListener('keydown', event => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.target.matches('input, textarea, select, button, a')) return;
@@ -161,11 +182,11 @@
   new ResizeObserver(() => setCamera(true)).observe(viewport);
   reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) setPlaying(false); setCamera(true); });
   $('duration').textContent = clock(total);
-  document.querySelector('.window-right').textContent = `${data.cols} × ${data.rows}`;
+
   update(true);
   // A direct file open stays still until Play. This makes the first frame readable,
   // preserves reduced-motion preferences, and avoids unsolicited autoplay.
   if (new URLSearchParams(location.search).get('play') === '1' && !reducedMotion.matches) setPlaying(true);
   // Small read-only test surface; no network, backend, Claude, or GitHub operations.
-  window.reviewDemo = Object.freeze({ seek: seconds => seek(seconds * 1000), pause: () => setPlaying(false), play: () => { if (time >= total) seek(0); setPlaying(true); }, getState: () => ({ index, time, total, playing, rate, frame: frames[index].id }) });
+  window.reviewDemo = Object.freeze({ seek: seconds => seek(seconds * 1000), pause: () => setPlaying(false), play: () => { if (time >= total) seek(0); setPlaying(true); }, getState: () => ({ index, time, total, playing, rate, actualSize, fullView, imageReady: image.complete && image.naturalWidth === raster.width, frame: frames[index].id }) });
 })();

@@ -4,6 +4,7 @@ All product pictures come from the actual Ratatui renderer with synthetic PR dat
 
 - `workspace.webp`, `files.webp`, `context.webp`: frames 5, 1 and 11 of `demo/frames.json`, cropped in `render-stills.py`.
 - `review.webp`: the expanded synthetic review from `ui::tests::export_review_flow_preview`, cropped to the comment list.
+- `/demo/tui/`: lossless native frame images and the shared tour player. Image/source/profile hashes are checked during every site build.
 - `tour.mp4` in the built site: `demo/lazyreview-demo.mp4`, copied unchanged. See [the demo guide](../demo/README.md) for its timeline, renderer and scripted-reply disclosure.
 - Bricolage Grotesque: [Google Fonts source](https://github.com/google/fonts/tree/main/ofl/bricolagegrotesque), under the included `assets/Bricolage-OFL.txt` (SIL Open Font License).
 - The small LazyReview mark is project-authored SVG.
@@ -18,4 +19,4 @@ uv run --with pillow python site/render-stills.py --review outputs/review.json
 npm run site:build
 ```
 
-The shared video renderer currently expects local macOS JetBrains Mono and system fonts; see its font constants before rendering on another platform. Building or hosting the website uses the committed stills and does not require Python or those fonts.
+The shared renderer uses the exact bundled JetBrainsMono Nerd Font files from the local Alacritty setup, plus macOS symbol fallbacks. The sanitized colors, font hashes and metrics live in `demo/terminal-profile.json`. See `demo/README.md` for the portable backdrop and rasterization limits. Building or hosting the website uses the committed stills and does not require Python or those fonts.

@@ -1765,6 +1765,7 @@ mod tests {
     #[test]
     #[ignore = "manual review-flow native-cell artifact"]
     fn export_review_flow_preview() {
+        crate::demo::apply_profile();
         let mut screens = vec![];
         for (w, h) in [(100, 36), (58, 28)] {
             for state in ["closed", "expanded", "editor", "confirm"] {
@@ -1798,7 +1799,7 @@ mod tests {
                 let mut terminal =
                     ratatui::Terminal::new(ratatui::backend::TestBackend::new(w, h)).unwrap();
                 terminal.draw(|f| render(f, &mut a)).unwrap();
-                screens.push(serde_json::json!({"panel":state,"width":w,"height":h,"html":crate::preview::buffer_html(terminal.backend().buffer())}));
+                screens.push(serde_json::json!({"panel":state,"width":w,"height":h,"html":crate::preview::buffer_html_with_palette(terminal.backend().buffer(), &crate::demo::profile())}));
             }
         }
         let file = std::env::var("LAZYREVIEW_REVIEW_PREVIEW")
