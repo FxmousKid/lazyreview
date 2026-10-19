@@ -13,6 +13,7 @@
     "site:dev": "node scripts/serve-site.mjs",
     "site:build": "node scripts/build-site.mjs",
     "test:site": "node scripts/check-site.mjs",
-    "test:demo-server": "node --test tests/browser-native.test.mjs"
+    "test:demo-server": "node --test tests/browser-native.test.mjs",
+    "benchmark:browser": "node scripts/benchmark-browser.mjs"
   }
 }

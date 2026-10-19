@@ -65,12 +65,13 @@ test('stdio MCP saves an output and returns validation errors without exposing f
  assert.equal(await done,0);const results=out.trim().split('\n').map(JSON.parse);
  assert.ok(!results[0].result.isError);assert.equal(results[1].result.isError,true);assert.equal((await listArtifacts(dir)).length,1);
 });
-test('PR shelf survives session restart, new chat and new commits; background write gate follows turn type',async t=>{
+test('PR shelf survives session restart, new chat and new commits; background write gate follows turn type',{timeout:10000},async t=>{
  const root=await fixture(t),events=[];const config={enabled:true,profile:'artifact-test',command:resolve('tests/claude-fixture.mjs'),model:'fixture',autoPrepare:false,maxBudgetUsd:1};
- const c=new Companion(e=>events.push(e),{root});t.after(()=>c.close());
+ let accept;const accepted=new Promise(resolve=>{accept=resolve;});
+ const c=new Companion(e=>{events.push(e);if(e.type==='turn_accepted')accept();},{root});t.after(()=>c.close());
  await c.open({pr,config,binding:'1'});const dir=c.current.dir;
  assert.equal(JSON.parse(await readFile(join(dir,'snapshot.json'),'utf8')).allowArtifacts,false);
- await c.send({binding:'1',prompt:'SIMULATE_SLOW'});await new Promise(r=>setTimeout(r,50));
+ await c.send({binding:'1',prompt:'SIMULATE_SLOW'});await accepted;
  const snap=JSON.parse(await readFile(join(dir,'snapshot.json'),'utf8'));assert.equal(snap.allowArtifacts,true);assert.equal(snap.chatSession,c.current.record.session);
  const item=await createArtifact(dir,snap,args);await c.active?.done;
  assert.ok(events.some(e=>e.type==='artifacts'&&e.items.some(v=>v.id===item.id)));

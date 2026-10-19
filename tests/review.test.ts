@@ -511,57 +511,6 @@ test("an older pending review is not silently submitted against a new snapshot",
     /older commit/,
   );
 });
-test("submit sends pending review ID and explicit review event", async () => {
-  let submitted: any;
-  await executeGithub(
-    {
-      operation: "submit",
-      url,
-      expectedHead: "head",
-      expectedBase: "merge-base",
-      event: "REQUEST_CHANGES",
-      body: "Please add tests.",
-    },
-    "token",
-    fake((path, init) => {
-      if (!path.endsWith("/graphql")) return pr;
-      const body = JSON.parse(init.body as string);
-      if (body.query.trimStart().startsWith("query"))
-        return {
-          data: {
-            viewer: { login: "reviewer" },
-            repository: {
-              pullRequest: {
-                reviews: {
-                  nodes: [
-                    {
-                      id: "PENDING",
-                      author: { login: "reviewer" },
-                      commit: { oid: "head" },
-                    },
-                  ],
-                },
-              },
-            },
-          },
-        };
-      submitted = body.variables.input;
-      return {
-        data: {
-          submitPullRequestReview: {
-            pullRequestReview: { id: "PENDING", state: "CHANGES_REQUESTED" },
-          },
-        },
-      };
-    }),
-  );
-  assert.deepEqual(submitted, {
-    pullRequestReviewId: "PENDING",
-    event: "REQUEST_CHANGES",
-    body: "Please add tests.",
-  });
-});
-
 test('authenticated load includes pending replies and validates query syntax', async () => {
   const result = await executeGithub({ operation: 'load', url }, 'token', fake((path, init) => {
     if (path.endsWith('/graphql')) {

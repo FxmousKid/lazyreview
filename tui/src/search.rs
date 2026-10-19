@@ -1,6 +1,7 @@
 use crate::app::{array, s};
 use regex::{Regex, RegexBuilder};
 use serde_json::Value;
+use std::collections::HashMap;
 
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub enum Scope {
@@ -65,22 +66,32 @@ impl Search {
             return;
         };
         let lines = array(file, "lines");
-        let mut order: Vec<usize> = (0..lines.len()).collect();
-        if split {
-            order.clear();
+        let order: Vec<usize> = if split {
+            // Split cells own copies of the canonical lines. Index borrowed
+            // values once rather than scanning the entire diff for each cell
+            // on every keystroke. Keep the first equal line, as position did.
+            let mut indices = HashMap::with_capacity(lines.len());
+            for (i, line) in lines.iter().enumerate() {
+                indices.entry(line).or_insert(i);
+            }
+            let mut order = Vec::with_capacity(lines.len());
             for row in array(file, "splitRows") {
                 for side in ["left", "right"] {
-                    if !row[side].is_null() {
-                        if let Some(i) = lines.iter().position(|line| line == &row[side]) {
-                            // Unchanged context is displayed twice but is one search result.
-                            if order.last() != Some(&i) {
-                                order.push(i);
-                            }
+                    if row[side].is_null() {
+                        continue;
+                    }
+                    if let Some(&i) = indices.get(&row[side]) {
+                        // Unchanged context is displayed twice but is one search result.
+                        if order.last() != Some(&i) {
+                            order.push(i);
                         }
                     }
                 }
             }
-        }
+            order
+        } else {
+            (0..lines.len()).collect()
+        };
         for i in order {
             let line = &lines[i];
             if s(line, "kind") == "hunk" || !self.scope.allows(line) {
@@ -128,6 +139,33 @@ impl Search {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    #[ignore = "release-mode incremental split-search latency benchmark"]
+    fn benchmark_split_search_latency() {
+        for count in [1_000, 4_000, 8_000] {
+            let lines: Vec<_> = (0..count)
+                .map(|i| json!({"kind":"context","text":format!("let needle_{i} = {i};"),"old":i + 1,"new":i + 1}))
+                .collect();
+            let rows: Vec<_> = lines
+                .iter()
+                .map(|line| json!({"left":line,"right":line}))
+                .collect();
+            let file = json!({"lines":lines,"splitRows":rows});
+            let mut search = Search::default();
+            let start = std::time::Instant::now();
+            for query in ["n", "ne", "nee", "need", "needl", "needle"] {
+                search.query = query.into();
+                search.rebuild(&file, true);
+                assert_eq!(search.hits.len(), count);
+            }
+            println!(
+                "{}",
+                json!({"lines":count,"keystrokes":6,"total_ms":start.elapsed().as_secs_f64() * 1000.0})
+            );
+        }
+    }
+
     #[test]
     fn literal_smartcase_unicode_and_split_side_search_keep_anchors() {
         let old = json!({"kind":"delete","text":"écho ÉCHO a.b a.b","old":4});
@@ -155,5 +193,41 @@ mod tests {
         search.query = "missing".into();
         search.rebuild(&file, true);
         assert!(search.step(true, 0).is_none());
+    }
+
+    #[test]
+    fn split_results_follow_display_order_without_merging_equal_text_at_other_lines() {
+        let old = json!({"kind":"delete","text":"needle","old":7});
+        let new = json!({"kind":"add","text":"needle","new":9});
+        let context = json!({"kind":"context","text":"needle","old":8,"new":10});
+        let absent = json!({"kind":"add","text":"needle","new":11});
+        let file = json!({
+            "lines":[old,new,context,old,null],
+            "splitRows":[
+                {"left":context,"right":context},
+                {"left":null,"right":null},
+                {"left":context,"right":null},
+                {"left":old,"right":new},
+                {"left":null,"right":absent}
+            ]
+        });
+        let mut search = Search {
+            query: "needle".into(),
+            ..Search::default()
+        };
+        search.rebuild(&file, true);
+        assert_eq!(
+            search.hits.iter().map(|hit| hit.line).collect::<Vec<_>>(),
+            [2, 0, 1]
+        );
+        assert_eq!(search.first_from(0).unwrap().line, 2);
+        assert_eq!(search.step(true, 2).unwrap().line, 0);
+        assert_eq!(search.step(false, 0).unwrap().line, 2);
+        search.scope = Scope::Original;
+        search.rebuild(&file, true);
+        assert_eq!(
+            search.hits.iter().map(|hit| hit.line).collect::<Vec<_>>(),
+            [2, 0]
+        );
     }
 }

@@ -6,8 +6,10 @@
 .demo-disclosure{color:var(--muted);font-size:13px;flex:1}
 .demo-toolbar nav{display:flex;align-items:center;gap:10px;margin-left:auto}
 .demo-toolbar nav button,.demo-toolbar nav a{min-height:36px;padding:7px 12px;border:0;border-radius:4px;color:var(--ui);background:transparent;text-decoration:none;font-size:13px}
-.demo-toolbar nav button:hover,.demo-toolbar nav a:hover{background:#30363d}
-.demo-toolbar nav a{background:var(--accent);color:white}
+@media(hover:hover) and (pointer:fine){.demo-toolbar nav button:hover,.demo-toolbar nav a:hover{background:#30363d}}
+.demo-toolbar nav a:last-child{background:var(--accent);color:white}
+.demo-toolbar nav button:focus-visible,.demo-toolbar nav a:focus-visible{outline:2px solid #a184df;outline-offset:2px}
+.demo-toolbar nav button:active,.demo-toolbar nav a:active{filter:brightness(.9)}
 .demo-toolbar kbd{margin-left:8px;color:var(--muted)}
 .demo-main{display:flex;flex:1;min-height:0}
 .demo-main .workbench{flex:1;min-height:0;overflow:hidden;outline-offset:-3px}
@@ -40,8 +42,8 @@
 @media(max-width:780px){
   .demo-toolbar{min-height:54px;padding:8px 12px;gap:10px;flex-wrap:wrap}
   .demo-toolbar .wordmark{font-size:20px}
-  .demo-disclosure{display:none}
-  .demo-toolbar nav{gap:4px}
+  .demo-disclosure{font-size:11px;flex:1;text-align:right}
+  .demo-toolbar nav{flex-basis:100%;justify-content:flex-end;gap:4px}
   .demo-toolbar nav button,.demo-toolbar nav a{font-size:12px;padding:8px;min-height:38px}
   .demo-toolbar kbd{display:none}
   .demo-main .sim-head{padding-inline:12px;min-height:46px}

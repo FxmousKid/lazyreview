@@ -213,15 +213,14 @@ impl App {
         self.pr["demo"] == true
     }
     pub fn visible(&self) -> Vec<usize> {
+        let query = self.filter.to_lowercase();
         let mut indices: Vec<usize> = self
             .files()
             .iter()
             .enumerate()
             .filter(|(_, f)| {
                 self.category.as_ref().is_none_or(|c| s(f, "category") == c)
-                    && s(f, "filename")
-                        .to_lowercase()
-                        .contains(&self.filter.to_lowercase())
+                    && (query.is_empty() || s(f, "filename").to_lowercase().contains(&query))
                     && (self.show_hidden || !self.hidden.contains(s(f, "filename")))
                     && (!self.unviewed || f["viewed"] != true)
             })
@@ -2006,8 +2005,10 @@ impl App {
         }
     }
     fn rebuild_search(&mut self) {
-        let file = self.current().clone();
-        self.search.rebuild(&file, self.split);
+        // Borrow the PR separately from search so typing never clones its
+        // patches, split rows or full-file context.
+        let file = array(&self.pr, "files").get(self.file).unwrap_or(&V::Null);
+        self.search.rebuild(file, self.split);
     }
     fn update_search(&mut self) {
         self.editor_cursor = self.editor.len();

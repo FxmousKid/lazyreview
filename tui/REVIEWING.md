@@ -2,10 +2,9 @@
 
 ## Start
 
-From the installed directory:
+From the repository root after [building](README.md#run):
 
 ```sh
-cd ~/Desktop/Dev/OSS/LazyReview
 gh auth login
 ./lazyreview
 # Or open a particular PR:
@@ -60,30 +59,9 @@ GitHub stores saved pending comments. They are not sent to the PR author until t
 
 `b` opens threads; `i` replies, and `R` opens resolve/reopen confirmation. Markdown and common GitHub HTML render headings, emphasis, code, lists, task lists, tables, quotes and links. HTML coverage reports use real table cells; narrow panes show labelled records instead of clipping columns. `<details>` summaries and their contents are shown expanded. Scripts/styles are omitted; images show alt text without fetching assets. `p` cycles companion views. `g ?` (or `g !`) opens all shortcuts; `f` filters them; one Escape closes the overlay.
 
-## Reproduce validation
+## Verify a review workflow
 
-Offline, including complex reviews:
-
-```sh
-cargo test --locked --manifest-path tui/Cargo.toml
-node --test tests/*.test.mjs tests/*.test.ts
-cargo build --release --locked --manifest-path tui/Cargo.toml
-python3 tests/tui-pty.py
-python3 tests/tui-controls-pty.py
-python3 tests/tui-search-pty.py
-```
-
-Explicit live **read-only** checks:
-
-```sh
-./lazyreview --check https://github.com/OWNER/REPO/pull/123
-node tests/tui-live-read.mjs --live --pr https://github.com/OWNER/REPO/pull/123
-python3 tests/tui-picker-pty.py --live
-```
-
-The deeper read probe loads threads, diffs and immutable content, prepares multi-range references without sending them, and checks `@` / `#` suggestions. It prints only counts and pass/fail metadata. `--mine` can replace `--pr URL` to choose a PR from your top repository.
-
-Automated write tests use synthetic data and mocked GitHub responses. No real comment/review has been published by this validation. For live posting, use a disposable PR; verify draft anchors, final publication, reply, and resolution on GitHub itself. Claude Code streaming and session resumption have a separate live probe, documented in [CLAUDE.md](CLAUDE.md).
+Use the [check map](../VALIDATION.md) for offline replays and explicit live reads. `tui-review-flow-pty.py` exercises the actual bridge from draft to inspection and exactly one publication, using sample state. GitHub write tests use mocked responses; no real comment/review has been published by this validation. Live writes need a disposable PR and verification on GitHub. Provider checks have separate setup and usage boundaries in [CLI integrations](CLI-INTEGRATIONS.md).
 
 ## Read the PR
 

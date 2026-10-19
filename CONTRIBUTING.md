@@ -1,15 +1,13 @@
 # Contributing
 
-Read [AGENTS.md](AGENTS.md) and the relevant [TUI guide](tui/README.md). Keep changes focused, document new keys, and include the smallest regression that proves the behavior.
+Read [AGENTS.md](AGENTS.md) for the source map and [VALIDATION.md](VALIDATION.md) for checks by change type. Keep changes focused, update affected keys/docs, and test observable behavior. Prefer a regression that would fail before the fix; merge duplicate coverage rather than adding assertions about source spelling or private structure.
 
 ```sh
 npm test
 cargo test --locked --manifest-path tui/Cargo.toml
 cargo fmt --manifest-path tui/Cargo.toml -- --check
-npm run site:build
-npm run test:site   # installed Chrome/Chromium; CHROME_PATH overrides discovery
 ```
 
 For AI adapters, follow [CLI integrations](tui/CLI-INTEGRATIONS.md) and update its capability table in the same change. Never commit tokens, local state or provider transcripts. Use synthetic fixtures or your own disposable PR for tests that write to GitHub.
 
-The showcase is plain HTML/CSS/JS. Its sample is deliberately local and scripted; keep that visible. Update actual screenshots/video when the demonstrated interface changes. Fonts use the included OFL license; vendored Mermaid code retains its upstream license.
+The showcase uses plain HTML/CSS/JS; its interactive demo runs the real Rust app in isolated sample-only processes. Keep sample AI replies labelled. Regenerate native screenshots/video after changing the demonstrated interface. Fonts retain their included OFL license; vendored Mermaid retains its upstream license.

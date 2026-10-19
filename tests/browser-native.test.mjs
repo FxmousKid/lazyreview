@@ -5,6 +5,18 @@ import {existsSync} from 'node:fs';
 import {TuiSessions,nativeBinary} from '../scripts/tui-sessions.mjs';
 const binary=nativeBinary();
 const available=!!binary&&existsSync(binary);
+test('pool shutdown cancels reserved creation and refuses new sessions',async()=>{
+ const pool=new TuiSessions({binary:process.execPath});
+ try{
+  const creating=pool.create(80,24);
+  assert.equal(pool.starting,1,'creation reserved before private HOME resolves');
+  pool.close();
+  await assert.rejects(creating,/Demo has stopped/);
+  await assert.rejects(pool.create(80,24),/Demo has stopped/);
+  assert.equal(pool.starting,0,'cancelled creation releases its reservation');
+  assert.equal(pool.sessions.size,0,'shutdown must not resurrect a detached session');
+ }finally{pool.close();}
+});
 // npm test also runs before the native build; CI runs this file again after build.
 test('hosted native sessions isolate state, reject outside origins and expire cleanly',{skip:!available},async()=>{
  const pool=new TuiSessions({binary,max:2,idleMs:300000});

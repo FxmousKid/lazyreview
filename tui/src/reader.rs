@@ -481,11 +481,11 @@ fn build(a: &App, width: u16) -> markdown::Document {
                 );
             } else {
                 doc.lines.push(Line::styled(
-                    "A second pair of eyes.",
+                    "Talk through this PR.",
                     base().add_modifier(Modifier::BOLD),
                 ));
                 doc.lines.push(Line::from(""));
-                doc.lines.extend(markdown::document_at(if !a.ai.enabled && !a.is_demo() { "Connect Claude Code to talk through this PR. Your chat stays with the review." } else { "Talk through the whole PR. Explore its purpose, challenge a design, or ask for a diagram.\n\nWhat problem does this solve?\nWhere would you start reviewing?\nMap the flow as a diagram." }, true, width).lines);
+                doc.lines.extend(markdown::document_at(if !a.ai.enabled && !a.is_demo() { "Connect Claude Code to start a chat for this PR." } else { "Ask about the whole PR, or attach code from several files.\n\nWhat problem does this solve?\nHow do these changes fit together?\nShow the flow as a diagram." }, true, width).lines);
             }
         }
         for m in &a.messages {
@@ -874,7 +874,7 @@ pub fn render(f: &mut Frame, a: &mut App, area: Rect) {
                 f,
                 Rect::new(parts[0].x, parts[0].y + 2, parts[0].width, 1),
                 Line::from(text(
-                    format!("{} for next turn · g c Inspect", a.context.len()),
+                    format!("{} queued · g c Context", a.context.len()),
                     theme().accent,
                 )),
             );
@@ -1064,7 +1064,7 @@ pub fn context(f: &mut Frame, a: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
     if a.context.is_empty() {
-        f.render_widget(paragraph("Select code with v, then a to attach or t to leave a note.\nRepeat across files; i asks your companion about the selection.\n\nEsc Close"),inner);
+        f.render_widget(paragraph("v Select code · a Attach · t Add AI note\nRepeat across files, then i to ask.\n\nEsc Close"),inner);
         return;
     }
     let parts = Layout::vertical([
@@ -1156,7 +1156,7 @@ pub fn artifacts(f: &mut Frame, a: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
     if a.ai.artifacts.is_empty() {
-        f.render_widget(paragraph("Ask your companion for a diagram, HTML explainer, or notes.\nSaved outputs stay with this PR.\n\nEsc Close"), inner);
+        f.render_widget(paragraph("Ask for a diagram, HTML page or notes.\nOutputs saved for this PR appear here.\n\nEsc Close"), inner);
         return;
     }
     let parts = Layout::vertical([

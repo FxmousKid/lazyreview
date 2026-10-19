@@ -23,7 +23,7 @@ try:
     read(.8);has('acme/atlas #128');has('Your review · 0')
     for label in ['LazyReview','LIVE GITHUB','NORMAL']:assert label not in screen.text()
     assert ''.join(screen.rows[-1]).startswith(' acme/atlas #128')
-    has('D Description');send('D');has('Pull request');has('@')
+    send('D');has('Pull request');has('@')
     send('C');has('Pull request');has('Ready for review')
     send('gm');has('Pull request');has('36fb81a')
     send('D');send('o');has('PR timeline');send('\x1b')

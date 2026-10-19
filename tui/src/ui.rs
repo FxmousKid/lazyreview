@@ -113,15 +113,18 @@ pub fn render(f: &mut Frame, a: &mut App) {
         a.pr["number"],
         if a.is_demo() { " · sample" } else { "" }
     );
-    let hints = if !a.is_demo() {
+    let hint_options = [
         format!(
-            "g a {} · {}  ? Shortcuts  \\ Panes ",
-            a.ai.name(),
-            a.ai.label()
-        )
-    } else {
-        "g a Claude  D Description  ? Shortcuts  \\ Panes  r Your review ".into()
-    };
+            "g a {}  D PR  r Review  ? Shortcuts  \\ Panes ",
+            a.ai.name()
+        ),
+        "g a AI  D PR  r Review  ? Shortcuts ".into(),
+        "? Shortcuts ".into(),
+    ];
+    let hints = hint_options
+        .into_iter()
+        .find(|hint| Line::from(hint.as_str()).width() <= (area.width / 2) as usize)
+        .unwrap_or_else(|| "? ".into());
     let footer = Layout::horizontal([
         C::Min(0),
         C::Length((hints.len() as u16).min(area.width / 2)),
@@ -435,7 +438,11 @@ fn diff(f: &mut Frame, a: &mut App, area: Rect, annotations: &crate::annotations
         return;
     }
     if a.lines().is_empty() {
-        f.render_widget(para("Diff unavailable.\nGitHub omitted this patch (binary or large file).\nOpen the PR on GitHub to inspect it.").wrap(Wrap{trim:false}),layout[1]);
+        f.render_widget(
+            para("Patch unavailable (binary or large file).\nOpen this file on GitHub.")
+                .wrap(Wrap { trim: false }),
+            layout[1],
+        );
         return;
     }
     let mut lines = vec![];

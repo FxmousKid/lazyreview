@@ -744,10 +744,8 @@ impl Picker {
             rows[3],
         );
         f.render_widget(
-            Paragraph::new(
-                " h/l panes   j/k select   Enter open   / search history   f filter   ? help",
-            )
-            .style(Style::default().fg(t.muted)),
+            Paragraph::new(" h/l Panes · j/k Select · Enter Open · / Search · f Filter · ? Keys")
+                .style(Style::default().fg(t.muted)),
             rows[4],
         );
         if self.busy {
@@ -838,11 +836,11 @@ impl Picker {
             );
         } else if items.is_empty() {
             let text = if self.search.repository.is_none() {
-                " No matches. Enter owner/repo to browse any repository."
+                " No matches · Enter owner/repo to browse."
             } else if self.search.all_authors {
                 " No matching PRs."
             } else {
-                " No matching authored PRs. Tab shows all authors."
+                " No matching PRs by you · Tab All authors"
             };
             f.render_widget(Paragraph::new(text).wrap(Wrap { trim: false }), rows[1]);
         } else {
@@ -930,9 +928,9 @@ impl Picker {
             rows[2],
         );
         let hint = if self.search.repository.is_some() {
-            " ↑↓ choose  Enter open  Tab authors  Alt-← repos  Esc close"
+            " ↑↓ Select · Enter Open · Tab Authors · Alt-← Repos · Esc Close"
         } else {
-            " ↑↓ choose  Enter select  owner/repo browse  Ctrl-r refresh  Esc close"
+            " ↑↓ Select · Enter Open · owner/repo Browse · Esc Close"
         };
         f.render_widget(
             Paragraph::new(hint).style(Style::default().fg(theme().muted)),
@@ -1048,9 +1046,9 @@ impl Picker {
                 Paragraph::new(if self.busy {
                     clean(&self.status)
                 } else if !self.filter.is_empty() {
-                    "No matches on this page. Press f to edit the filter.".into()
+                    "No matches · f Edit filter".into()
                 } else if self.repository.is_empty() && self.scope == 0 {
-                    "Select a repository and press Enter.".into()
+                    "Choose a repository · Enter Open".into()
                 } else {
                     clean(&self.status)
                 })

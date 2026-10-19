@@ -123,7 +123,7 @@ node tests/ai-grounding-live.mjs --live
 node tests/artifacts-live.mjs --live
 ```
 
-The original Paper live probe verified repository tool reads, streaming and exact session memory after restart. The artifact probe additionally created a real SVG and HTML page, restarted the native session, then listed and read back the saved diagram. See [validation](../VALIDATION.md) for exact evidence and limits. No GitHub writes were made. Voice, automatic import of externally written chat messages, full-repository text search, GitHub Enterprise and cross-machine session synchronization are not implemented.
+The original Paper live probe verified repository tool reads, streaming and exact session memory after restart. The artifact probe additionally created a real SVG and HTML page, restarted the native session, then listed and read back the saved diagram. See [checks and limits](../VALIDATION.md) for reproducible commands and remaining boundaries. No GitHub writes were made. Voice, automatic import of externally written chat messages, full-repository text search, GitHub Enterprise and cross-machine session synchronization are not implemented.
 
 ## Interactive CLI mode
 
@@ -145,4 +145,4 @@ Open **g a** to launch Claude Code in a private PTY inside the right pane. Its n
 
 A first launch passes `--session-id <UUID>`; later launches pass `--resume <the exact UUID>`. Sessions receive a title such as `LazyReview owner/repo #123 · 7a9d2e10`, where the suffix identifies the PR/profile association. Switching interfaces or models keeps that session; **N** explicitly creates another UUID. Native `/clear` and `/resume` session changes update this association through `SessionStart`, archive the previous display cache and refresh the supplied code context. No private Claude JSONL file is read or rewritten.
 
-The native UI uses the existing Claude login, LazyReview's repository/artifact MCP tools and its own lifecycle hooks. Built-in shell/file tools and other MCP servers remain disabled. It does not inherit Paper's budget, turn-count or timeout controls. Quit stops only the owned child process group. See [validation](../VALIDATION.md) for the current native-mode test evidence; earlier streaming probes apply to Paper.
+The native UI uses the existing Claude login, LazyReview's repository/artifact MCP tools and its own lifecycle hooks. Built-in shell/file tools and other MCP servers remain disabled. It does not inherit Paper's budget, turn-count or timeout controls. Quit stops only the owned child process group. See [checks and limits](../VALIDATION.md); Paper streaming probes do not establish native terminal compatibility.

@@ -40,23 +40,35 @@ class Session {
 }
 export class TuiSessions {
   constructor({binary=nativeBinary(),max=8,idleMs=300000,lifetimeMs=1800000}={}){
-    this.binary=binary;this.max=max;this.idleMs=idleMs;this.lifetimeMs=lifetimeMs;this.sessions=new Map();this.creations=[];this.starting=0;
+    this.binary=binary;this.max=max;this.idleMs=idleMs;this.lifetimeMs=lifetimeMs;this.sessions=new Map();this.creations=[];this.starting=0;this.closed=false;
     this.timer=setInterval(()=>this.sweep(),15000);this.timer.unref();
   }
   sweep(){const now=Date.now();for(const [id,s] of this.sessions)if(s.closed||now-s.touched>this.idleMs||now-s.created>this.lifetimeMs){s.close();this.sessions.delete(id);}}
   async create(cols,rows){
+    if(this.closed)throw Error('Demo has stopped. Try again shortly.');
     this.sweep();if(!this.binary||!existsSync(this.binary))throw Error('The interactive demo is unavailable. Try again shortly.');
     this.creations=this.creations.filter(t=>Date.now()-t<60000);
     if(this.sessions.size+this.starting>=this.max||this.creations.length>=30)throw Error('Demo is busy. Try again shortly.');
     this.creations.push(Date.now());
     this.starting++;
-    const id=randomBytes(24).toString('hex');let home;try{home=await mkdtemp(join(tmpdir(),'lazyreview-browser-'));}catch(error){this.starting--;throw error;}
-    // Explicit environment: no user GitHub tokens, provider keys, configs, SSH,
-    // shell initialization or native CLI credentials cross into a visitor session.
-    const env={PATH:dirname(process.execPath),HOME:home,XDG_CONFIG_HOME:join(home,'config'),XDG_CACHE_HOME:join(home,'cache'),TMPDIR:home,LANG:'en_US.UTF-8'};
-    const child=spawn(resolve(this.binary),['--browser-demo'],{cwd:home,env,detached:true,stdio:['pipe','pipe','ignore']});
-    const session=new Session(child,home);this.sessions.set(id,session);this.starting--;
-    try{return {session:id,...await session.update([{type:'resize',cols,rows}])};}
+    const id=randomBytes(24).toString('hex');let home,session;
+    try{
+      home=await mkdtemp(join(tmpdir(),'lazyreview-browser-'));
+      // close() may run while the private directory is being created. Do not
+      // launch a detached child after teardown has already drained the pool.
+      if(this.closed)throw Error('Demo has stopped. Try again shortly.');
+      // Explicit environment: no user GitHub tokens, provider keys, configs, SSH,
+      // shell initialization or native CLI credentials cross into a visitor session.
+      const env={PATH:dirname(process.execPath),HOME:home,XDG_CONFIG_HOME:join(home,'config'),XDG_CACHE_HOME:join(home,'cache'),TMPDIR:home,LANG:'en_US.UTF-8'};
+      const child=spawn(resolve(this.binary),['--browser-demo'],{cwd:home,env,detached:true,stdio:['pipe','pipe','ignore']});
+      session=new Session(child,home);this.sessions.set(id,session);
+    }catch(error){if(home)await rm(home,{recursive:true,force:true});throw error;}
+    finally{this.starting--;}
+    try{
+      const frame=await session.update([{type:'resize',cols,rows}]);
+      if(this.closed)throw Error('Demo has stopped. Try again shortly.');
+      return {session:id,...frame};
+    }
     catch(error){session.close();this.sessions.delete(id);throw error;}
   }
   async handle(req,res){
@@ -84,5 +96,5 @@ export class TuiSessions {
     }catch(error){reply(400,{error:error.message||'Demo unavailable'});}
     return true;
   }
-  close(){clearInterval(this.timer);for(const s of this.sessions.values())s.close();this.sessions.clear();}
+  close(){this.closed=true;clearInterval(this.timer);for(const s of this.sessions.values())s.close();this.sessions.clear();}
 }

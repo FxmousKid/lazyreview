@@ -38,17 +38,17 @@ cargo test --locked --manifest-path tui/Cargo.toml mermaid::tests
 cargo test --locked --manifest-path tui/Cargo.toml mermaid::tests::benchmark_cache_latency -- --ignored --nocapture
 ```
 
-Local debug-build result: first request enqueue **76.5 µs**, cold result **52.8 ms** including Node startup, warm cache **1.35 µs** mean over 10,000 reads. Four Rust checks passed plus the manual benchmark; seven Node checks passed. These are measured here, not upstream performance claims. The previous reader displayed raw fenced source only. Flowchart output was checked at 24 columns; sequence labels and geometry were inspected at 60 columns. Wide sequences retained source. Full Mermaid parity is not claimed.
+The tests check supported labels/geometry, narrow-column fallback, unsupported forms and source/output limits. The ignored benchmark reports local cold and cached latency; it is not a portable timing gate or a claim of full Mermaid parity.
 
-## Rebuild the vendored dependency
+## Vendored dependency
 
-The normal build embeds the bundle and does not run npm. To reproduce it, obtain pinned build inputs in a scratch directory:
+Normal builds embed `vendor/beautiful-mermaid-1.1.3.mjs` and its adjacent MIT license; they do not install npm dependencies. The bundle was generated from the published package's `src/ascii/index.ts` using esbuild 0.25.12. The repository currently ships the bundle, without its generation tooling.
 
-```sh
-mkdir -p /tmp/lazyreview-mermaid-build
-npm pack beautiful-mermaid@1.1.3 --ignore-scripts --pack-destination /tmp/lazyreview-mermaid-build
-npm install --prefix /tmp/lazyreview-mermaid-build/tools --ignore-scripts --no-audit --no-fund --save-exact esbuild@0.25.12
-node scripts/vendor-mermaid.mjs /tmp/lazyreview-mermaid-build/beautiful-mermaid-1.1.3.tgz /tmp/lazyreview-mermaid-build/tools/node_modules/.bin/esbuild
-```
+For an upgrade, reproduce the text-only bundle in a scratch directory from pinned package/bundler versions. Check the package hash before execution, reject external runtime imports and dynamic code/network APIs, retain the upstream license, and run both check suites above. Add the reproducible build command/tooling in the same change as any replacement bundle.
 
-The script verifies the package SHA-256 and bundler version, rejects external runtime imports, bundles only `src/ascii/index.ts`, and copies its MIT license. Rebuilding produced the identical checked-in SHA-256: `3d6fe46162020cb820d473d20f5d8bc3c3405b09ff2118cd7504117e5b2126ee`. The package tarball SHA-256 is `4d436f27bb0102985940c3efe317153f4d1f53f20f029f226b60e1ab4b6b9ff0`. Keep license, bundle, tests and this document together when upgrading.
+Current provenance:
+
+- Package tarball SHA-256: `4d436f27bb0102985940c3efe317153f4d1f53f20f029f226b60e1ab4b6b9ff0`.
+- Checked-in bundle SHA-256: `3d6fe46162020cb820d473d20f5d8bc3c3405b09ff2118cd7504117e5b2126ee`.
+
+Keep bundle, license, tests and this document together when upgrading.

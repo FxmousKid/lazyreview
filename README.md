@@ -8,7 +8,7 @@ Filter code, tests and docs. Read inline or split diffs, queue private questions
 
 ## Run
 
-Requires **Rust 1.88+**, **Node.js 22.18+**, and [GitHub CLI](https://cli.github.com/).
+Build with **Rust 1.88+** and a C compiler. Run with **Node.js 22.18+**; [GitHub CLI](https://cli.github.com/) supplies the usual login (`GH_TOKEN` / `GITHUB_TOKEN` also work).
 
 ```sh
 git clone https://github.com/FxmousKid/lazyreview.git
@@ -38,11 +38,13 @@ gh auth login
 
 AI notes are supplied with your **next prompt**, through Claude’s context hook. They are not visible typed messages or GitHub comments. Successful answers consume delivered notes; errors and interruptions keep them. [How context works](tui/CLAUDE.md).
 
-Settings: `~/.config/lazyreview/config.yml` ([example](tui/config.example.yml)). Drag pane borders to resize; themes import Lazygit colors. GitHub stores review state; local filters and drafts stay in your session. This is an early project; [limits and validation](VALIDATION.md).
+Settings: `~/.config/lazyreview/config.yml` ([example](tui/config.example.yml)). Drag pane borders to resize; themes import Lazygit colors. GitHub stores saved review state; local filters and unsent text stay in your session. This is an early project; [limits and validation](VALIDATION.md).
 
 ## Develop
 
 `npm test` · `cargo test --locked --manifest-path tui/Cargo.toml` · `npm run site:dev`
+
+[Contributing](CONTRIBUTING.md) · [Checks and limits](VALIDATION.md)
 
 The showcase lives at `/lazyreview/`. Try the real TUI at `/lazyreview/demo/`: Vim keys, selections, AI notes and sample reviews. The web UI preview remains at `/lazyreview/demo/web/`; the recording is at `/lazyreview/demo/tour/`. Hosted sessions use isolated native processes and synthetic data.
 

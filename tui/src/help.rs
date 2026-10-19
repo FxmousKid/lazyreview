@@ -3,8 +3,9 @@ use crossterm::event::{KeyCode as K, KeyEvent, KeyModifiers as M};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    text::Line,
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
+    style::{Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 const KEYS: &[(&str, &str)] = &[
     ("Tab / Shift-Tab", "Next / previous pane"),
@@ -204,6 +205,7 @@ pub struct Help {
     pub filtering: bool,
     pub filter: String,
     pub scroll: usize,
+    max_scroll: usize,
 }
 impl Help {
     pub fn show(&mut self) {
@@ -211,6 +213,7 @@ impl Help {
         self.filtering = false;
         self.filter.clear();
         self.scroll = 0;
+        self.max_scroll = 0;
     }
     pub fn matches(&self) -> Vec<(&str, &str)> {
         let q = self.filter.to_lowercase();
@@ -252,7 +255,7 @@ impl Help {
                 K::Esc | K::Char('q' | '?') => self.open = false,
                 K::Char('f' | '/') => self.filtering = true,
                 K::Char('j') | K::Down => {
-                    self.scroll = (self.scroll + 1).min(self.matches().len().saturating_sub(1))
+                    self.scroll = self.scroll.saturating_add(1).min(self.max_scroll)
                 }
                 K::Char('k') | K::Up => self.scroll = self.scroll.saturating_sub(1),
                 K::Home => self.scroll = 0,
@@ -260,7 +263,7 @@ impl Help {
             }
         }
     }
-    pub fn render(&self, f: &mut Frame) {
+    pub fn render(&mut self, f: &mut Frame) {
         let area = f.area();
         let width = area.width.saturating_sub(4).min(108);
         let height = area.height.saturating_sub(2);
@@ -272,7 +275,7 @@ impl Help {
         );
         f.render_widget(Clear, rect);
         let block = Block::default()
-            .title(" Keyboard shortcuts · f filter · Esc close ")
+            .title(" Keyboard shortcuts ")
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .style(
@@ -287,39 +290,98 @@ impl Help {
             });
         let inner = block.inner(rect);
         f.render_widget(block, rect);
-        let rows = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).split(inner);
-        f.render_widget(
-            Paragraph::new(format!(
-                "Filter: {}{}",
-                self.filter,
-                if self.filtering {
-                    "▏"
-                } else {
-                    "  (f to edit)"
-                }
-            ))
-            .style(ratatui::style::Style::default().fg(theme().accent)),
-            rows[0],
-        );
-        let matches = self.matches();
-        let lines: Vec<Line> = if matches.is_empty() {
-            vec![Line::from(
-                "No matching shortcuts. Press f to change the filter.",
-            )]
+        let rows = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+        let query = if self.filter.is_empty() && !self.filtering {
+            "All shortcuts".into()
         } else {
-            matches
-                .iter()
-                .map(|(k, d)| Line::from(format!("{k:24} {d}")))
-                .collect()
+            format!("{}{}", self.filter, if self.filtering { "▏" } else { "" })
         };
         f.render_widget(
+            Paragraph::new(format!("⌕ {query}")).style(Style::default().fg(theme().accent)),
+            rows[0],
+        );
+        let lines = shortcut_lines(&self.matches(), rows[2].width);
+        self.max_scroll = lines.len().saturating_sub(rows[2].height as usize);
+        self.scroll = self.scroll.min(self.max_scroll);
+        f.render_widget(
             Paragraph::new(lines)
-                .wrap(Wrap { trim: false })
                 .scroll((self.scroll.min(u16::MAX as usize) as u16, 0))
-                .style(ratatui::style::Style::default().fg(theme().fg)),
-            rows[1],
+                .style(Style::default().fg(theme().fg)),
+            rows[2],
+        );
+        f.render_widget(
+            Paragraph::new("j/k Scroll · f Filter · Esc Close")
+                .style(Style::default().fg(theme().muted)),
+            rows[3],
         );
     }
+}
+// Keep wrapped descriptions under their own column instead of under the key.
+// Compact terminals stack each key above its description, preserving every binding.
+fn shortcut_lines(matches: &[(&str, &str)], width: u16) -> Vec<Line<'static>> {
+    if width == 0 {
+        return vec![];
+    }
+    if matches.is_empty() {
+        return crate::markdown::wrap(&[Line::from("No matching shortcuts.")], width);
+    }
+    let stacked = width < 76;
+    let key_width = matches
+        .iter()
+        .map(|(key, _)| Line::from(*key).width())
+        .max()
+        .unwrap_or(0);
+    let indent = if stacked {
+        2.min(width as usize - 1)
+    } else {
+        key_width + 2
+    };
+    let description_width = width.saturating_sub(indent as u16).max(1);
+    let mut lines = vec![];
+    for (key, description) in matches {
+        if stacked {
+            lines.extend(crate::markdown::wrap(
+                &[Line::styled(
+                    key.to_string(),
+                    Style::default()
+                        .fg(theme().accent)
+                        .add_modifier(Modifier::BOLD),
+                )],
+                width,
+            ));
+        }
+        for (i, line) in
+            crate::markdown::wrap(&[Line::from(description.to_string())], description_width)
+                .into_iter()
+                .enumerate()
+        {
+            let mut spans = if !stacked && i == 0 {
+                vec![
+                    Span::styled(
+                        key.to_string(),
+                        Style::default()
+                            .fg(theme().accent)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" ".repeat(indent - Line::from(*key).width())),
+                ]
+            } else {
+                vec![Span::raw(" ".repeat(indent))]
+            };
+            spans.extend(line.spans);
+            lines.push(Line::from(spans));
+        }
+        if stacked {
+            lines.push(Line::from(""));
+        }
+    }
+    lines
 }
 #[cfg(test)]
 mod tests {
@@ -338,5 +400,42 @@ mod tests {
         h.key(KeyEvent::new(K::Esc, M::NONE));
         assert!(!h.open);
         assert!(!h.filtering);
+    }
+    #[test]
+    fn wrapped_shortcuts_remain_readable_and_scroll_to_the_last_binding() {
+        use ratatui::{Terminal, backend::TestBackend};
+        for width in [42, 80, 120] {
+            let mut help = Help::default();
+            help.show();
+            let mut terminal = Terminal::new(TestBackend::new(width, 24)).unwrap();
+            terminal.draw(|f| help.render(f)).unwrap();
+            for _ in 0..1000 {
+                help.key(KeyEvent::new(K::Char('j'), M::NONE));
+            }
+            terminal.draw(|f| help.render(f)).unwrap();
+            let screen = terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .map(|cell| cell.symbol())
+                .collect::<String>();
+            assert!(
+                screen.contains("Quit; ordinary text while typing"),
+                "width {width}"
+            );
+            assert_eq!(help.scroll, help.max_scroll);
+            // A live filter must reset a scrolled view and expose its matching key.
+            help.key(KeyEvent::new(K::Char('f'), M::NONE));
+            for c in "side by side".chars() {
+                help.key(KeyEvent::new(K::Char(c), M::NONE));
+            }
+            terminal.draw(|f| help.render(f)).unwrap();
+            assert_eq!(help.scroll, 0);
+            assert_eq!(
+                help.matches(),
+                vec![("s", "Toggle diff layout: inline / side by side")]
+            );
+        }
     }
 }
