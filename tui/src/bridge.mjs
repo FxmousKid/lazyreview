@@ -21,6 +21,10 @@ function githubToken() {
 const normalize = pr => ({ ...pr, files: pr.files.map(f => ({ ...f, category: categorize(f.filename), lines: parsePatch(f.patch), splitRows: splitRows(parsePatch(f.patch)) })) });
 async function handle(input) {
   const { operation } = input;
+  if (process.env.LAZYREVIEW_SAMPLE_ONLY === '1') {
+    if (!['sample','syntax','attach','chat','viewed','draft','submit','reply','resolve','conversation'].includes(operation) ||
+        (operation === 'syntax' && input.demo !== true)) throw Error('Hosted demo only supports the synthetic PR.');
+  }
   if (operation === 'syntax') return syntaxSources(input, sample, request => readSnapshotContent(request, githubToken()));
   if (operation === 'suggest') { try { return await complete(input, githubToken()); } catch { return {id:input.id,url:input.url,kind:input.kind,query:input.query,items:[],error:'Suggestions unavailable; continue typing.'}; } }
   if (operation === 'repositories') { token = undefined; return discoverRepositories(input, githubToken()); }

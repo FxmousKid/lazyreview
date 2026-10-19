@@ -16,6 +16,12 @@ pub struct Bridge {
 }
 impl Bridge {
     pub fn new() -> Result<Self, String> {
+        Self::with_mode(false)
+    }
+    pub fn sample_only() -> Result<Self, String> {
+        Self::with_mode(true)
+    }
+    fn with_mode(sample_only: bool) -> Result<Self, String> {
         let dir = tempfile::tempdir().map_err(|_| "Cannot create private bridge directory")?;
         for (name, content) in [
             ("bridge.mjs", include_str!("bridge.mjs")),
@@ -33,6 +39,10 @@ impl Bridge {
         let mut child = Command::new("node")
             .arg("--disable-warning=ExperimentalWarning")
             .arg(dir.path().join("bridge.mjs"))
+            .env(
+                "LAZYREVIEW_SAMPLE_ONLY",
+                if sample_only { "1" } else { "0" },
+            )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -192,6 +202,19 @@ mod tests {
                 .unwrap()["body"],
             "General comment"
         );
+    }
+    #[test]
+    fn hosted_bridge_refuses_live_reads_before_authentication() {
+        let mut bridge = Bridge::sample_only().unwrap();
+        assert!(initial(&mut bridge, None).unwrap()["demo"] == true);
+        for input in [
+            json!({"operation":"repositories"}),
+            json!({"operation":"discover"}),
+            json!({"operation":"load","url":"https://github.com/example/private/pull/1"}),
+            json!({"operation":"syntax","demo":false}),
+        ] {
+            assert!(bridge.request(&input).unwrap_err().contains("synthetic PR"));
+        }
     }
     #[test]
     fn worker_shutdown_restores_and_removes_child() {

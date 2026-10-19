@@ -14,11 +14,15 @@ jobs:
         run: npm test
       - name: Static showcase
         run: npm run site:build
-      - name: Browser sample
-        run: npm run test:site
       - name: Rust toolchain
         run: rustup toolchain install stable --profile minimal --component rustfmt
       - name: Rust format
         run: cargo +stable fmt --manifest-path tui/Cargo.toml -- --check
       - name: Native tests
         run: cargo +stable test --locked --manifest-path tui/Cargo.toml
+      - name: Build hosted native sample
+        run: cargo +stable build --release --locked --manifest-path tui/Cargo.toml
+      - name: Hosted native service isolation
+        run: npm run test:demo-server
+      - name: Interactive browser sample
+        run: npm run test:site

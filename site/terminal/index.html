@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>Try the LazyReview TUI</title>
+ <meta name="description" content="Use the real LazyReview terminal interface in your browser. Vim navigation, code selections, private AI notes and sample reviews.">
+ <meta name="theme-color" content="#090300"><link rel="canonical" href="https://iyan.nz/lazyreview/demo/">
+ <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+ <link rel="stylesheet" href="terminal.css"><script defer src="profile.js"></script><script defer src="terminal.js"></script>
+</head>
+<body>
+ <header><a class="brand" href="../">LazyReview</a><span class="sample">Sample PR · scripted AI</span><nav aria-label="Demo controls"><button id="help">Keys <kbd>?</kbd></button><button id="reset">Reset</button><a href="tour/">Tour ↗</a><a class="web-link" href="web/">Web preview ↗</a></nav></header>
+ <main id="stage" aria-label="Interactive LazyReview terminal">
+  <div id="terminal-scroll"><canvas id="screen" role="img" aria-label="Live LazyReview terminal. Click to focus; j and k navigate, Tab changes panes, question mark opens help."></canvas></div>
+  <textarea id="input" aria-label="LazyReview TUI keyboard input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+  <div id="loading" role="status">Starting the sample PR…</div><div id="keycast" aria-hidden="true" hidden></div>
+  <section id="failure" hidden><h1>Try again?</h1><p id="error" role="alert"></p><button id="retry">Restart the demo</button></section>
+ </main>
+ <div class="touch-keys" aria-label="Terminal keys"><button data-key="Tab">Tab</button><button data-key="Escape">Esc</button><button data-key="j">j ↓</button><button data-key="k">k ↑</button><button data-key="Enter">↵</button><button data-key="?">?</button><button id="type">Type</button></div>
+ <footer><span id="hint">Click the terminal, then <kbd>j</kbd>/<kbd>k</kbd> to move · <kbd>Tab</kbd> panes · <kbd>g a</kbd> Claude</span><span><kbd>Ctrl ]</kbd> release keys <button id="copy" hidden>Copy selection</button></span></footer>
+ <pre id="transcript" class="sr-only" aria-label="Terminal text"></pre>
+ <noscript><p class="no-script">Enable JavaScript to use the TUI. <a href="tour/">Watch the recorded tour</a>.</p></noscript>
+</body>
+</html>

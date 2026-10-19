@@ -3,12 +3,21 @@ import {stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {resolve,extname,sep} from 'node:path';
 import {buildSite} from './build-site.mjs';
-const root=await buildSite();
+import {TuiSessions} from './tui-sessions.mjs';
+const root=process.env.LAZYREVIEW_SITE_ROOT||await buildSite();
+const sessions=new TuiSessions();
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.ttf':'font/ttf','.txt':'text/plain; charset=utf-8','.mp4':'video/mp4'};
 const server=createServer(async(req,res)=>{
  try{
+  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
   const url=new URL(req.url,'http://localhost');
-  if(['/', '/lazyreview', '/lazyreview/demo', '/lazyreview/demo/tui'].includes(url.pathname)){res.writeHead(308,{location:(url.pathname==='/'?'/lazyreview/':url.pathname+'/')+url.search});res.end();return;}
+  if(url.pathname==='/healthz'){res.writeHead(200,{'content-type':'text/plain'});res.end('ok');return;}
+  if(await sessions.handle(req,res))return;
+  if(!['GET','HEAD'].includes(req.method)){res.writeHead(405);res.end();return;}
+  if(url.pathname==='/lazyreview/demo/tui'||url.pathname==='/lazyreview/demo/tui/'){res.writeHead(308,{location:'/lazyreview/demo/'+url.search});res.end();return;}
+
+  if(['/', '/lazyreview', '/lazyreview/demo', '/lazyreview/demo/tour', '/lazyreview/demo/web'].includes(url.pathname)){res.writeHead(308,{location:(url.pathname==='/'?'/lazyreview/':url.pathname+'/')+url.search});res.end();return;}
   if(!url.pathname.startsWith('/lazyreview/'))throw Error('missing');
   let file=resolve(root,decodeURIComponent(url.pathname.slice('/lazyreview/'.length))||'index.html');
   if(!file.startsWith(root+sep))throw Error('invalid path');
@@ -19,4 +28,6 @@ const server=createServer(async(req,res)=>{
   else{res.writeHead(200,{...headers,'content-length':info.size});if(req.method==='HEAD')res.end();else createReadStream(file).pipe(res);}
  }catch{res.writeHead(404);res.end('Not found');}
 });
-server.listen(Number(process.env.PORT||4179),'127.0.0.1',()=>console.log(`http://127.0.0.1:${server.address().port}/lazyreview/`));
+server.requestTimeout=15000;server.headersTimeout=15000;
+for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>{sessions.close();server.close(()=>process.exit(0));setTimeout(()=>process.exit(0),1500).unref();});
+server.listen(Number(process.env.PORT||4179),process.env.HOST||'127.0.0.1',()=>console.log(`http://127.0.0.1:${server.address().port}/lazyreview/`));

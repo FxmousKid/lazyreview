@@ -35,10 +35,49 @@ try{
   const homeUrl=url;
   await cdp('Page.navigate',{url:homeUrl});
   await wait(400);
-  assert.equal(await evaluate('document.querySelector("#try-review").getAttribute("href")'),'demo/tui/');
+  assert.equal(await evaluate('document.querySelector("#try-review").getAttribute("href")'),'demo/');
   assert.equal(await evaluate('document.querySelector(".sim")'),null);
-  assert.equal(await evaluate('document.querySelector(".demo-poster").getAttribute("href")'),'demo/tui/');
-  const nativeUrl=new URL('demo/tui/',homeUrl).href;
+  assert.equal(await evaluate('document.querySelector(".demo-poster").getAttribute("href")'),'demo/');
+  const interactiveUrl=new URL('demo/',homeUrl).href;
+  const until=async expression=>{for(let i=0;i<150;i++){if(await evaluate(expression))return;await wait(40);}throw Error('Native state did not settle: '+expression+' '+await evaluate('JSON.stringify(window.lazyreviewTui?.getState())'));};
+  await cdp('Page.navigate',{url:interactiveUrl});
+  await until('!!window.lazyreviewTui?.getState().ready');
+  await evaluate('document.fonts.ready');
+  assert.equal(await evaluate('document.activeElement.id'),'input');
+  assert.equal(await evaluate('window.LAZYREVIEW_TERMINAL_PROFILE.font.family'),'JetBrainsMono Nerd Font');
+  assert.equal(await evaluate('window.LAZYREVIEW_TERMINAL_PROFILE.font.sizePoints'),16);
+  assert.ok(await evaluate('document.fonts.check("32px LazyReviewTerminal")'));
+  assert.equal(await evaluate('window.lazyreviewTui.getState().pane'),0);
+  const cellPoint=async(x,y)=>evaluate(`(()=>{const r=document.querySelector('#screen').getBoundingClientRect();const p=window.LAZYREVIEW_TERMINAL_PROFILE.raster;return {x:r.left+(${x}+.5)*p.cellWidth/p.scale,y:r.top+(${y}+.5)*p.cellHeight/p.scale};})()`);
+  const canvasClick=async(x,y)=>{const point=await cellPoint(x,y);await cdp('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});};
+  let area=await evaluate('window.lazyreviewTui.getState().areas[1]');await canvasClick(area[0]+5,area[1]+5);await until('window.lazyreviewTui.getState().pane===1');
+  area=await evaluate('window.lazyreviewTui.getState().areas[0]');await canvasClick(area[0]+5,area[1]+5);await until('window.lazyreviewTui.getState().pane===0');
+  const cursor=await evaluate('window.lazyreviewTui.getState().treeCursor');await key('j');await until(`window.lazyreviewTui.getState().treeCursor>${cursor}`);await key('k');await until(`window.lazyreviewTui.getState().treeCursor===${cursor}`);
+  await key('n');await until('window.lazyreviewTui.getState().treeCursor>0');const file=await evaluate('window.lazyreviewTui.getState().file');await key('n');await until(`window.lazyreviewTui.getState().file!==${JSON.stringify(file)}`);await key('N',8);await until(`window.lazyreviewTui.getState().file===${JSON.stringify(file)}`);
+  await key('2');await until('window.lazyreviewTui.getState().category==="Tests"');await key('1');await until('window.lazyreviewTui.getState().category==="Code"');
+  await key('/');await until('window.lazyreviewTui.getState().editing');await type('#input','use-keyboard');await key('Enter');await until('!window.lazyreviewTui.getState().editing');assert.match(await evaluate('window.lazyreviewTui.text()'),/use-keyboard/);
+  await key('/');await until('window.lazyreviewTui.getState().editing');await key('Escape');await until('!window.lazyreviewTui.getState().editing');
+  await click('#reset');await until(`window.lazyreviewTui.getState().ready&&window.lazyreviewTui.getState().category==='Code'`);
+  await key('Tab');await until('window.lazyreviewTui.getState().pane===1');await key('s');await until('window.lazyreviewTui.getState().split');await key('s');await until('!window.lazyreviewTui.getState().split');
+  await key('v');await key('j');await key('t');await until('window.lazyreviewTui.getState().modal==="Editor(AiNote)"');await type('#input','Why is this boundary here?');await key('Enter');await until('window.lazyreviewTui.getState().context===1');
+  await key('n');await key('v');await key('j');await key('t');await until('window.lazyreviewTui.getState().modal==="Editor(AiNote)"');await type('#input','How does the other file fit?');await key('Enter');await until('window.lazyreviewTui.getState().context===2');
+  await key('g');await key('c');await until('window.lazyreviewTui.getState().modal==="Context"');assert.match(await evaluate('window.lazyreviewTui.text()'),/How does the other file/);await key('k');await until('window.lazyreviewTui.text().includes("Why is this boundary")');await key('Escape');
+  await key('g');await key('a');await until('window.lazyreviewTui.getState().panelVisible');await key('i');await until('window.lazyreviewTui.getState().modal==="Editor(Chat)"');await type('#input','Explain how these selections work together');await key('Enter');await until('window.lazyreviewTui.getState().messages===2&&window.lazyreviewTui.getState().context===0');assert.match(await evaluate('window.lazyreviewTui.text()'),/SAMPLE EXPLANATION/);
+  const sampleRow=await evaluate('window.lazyreviewTui.text().split("\\n").findIndex(line=>line.includes("SAMPLE EXPLANATION"))');
+  area=await evaluate('window.lazyreviewTui.getState().readerArea');
+  const sampleColumn=await evaluate('window.lazyreviewTui.text().split("\\n").find(line=>line.includes("SAMPLE EXPLANATION")).indexOf("SAMPLE")');
+  const dragStart=await cellPoint(sampleColumn,sampleRow),dragEnd=await cellPoint(sampleColumn+20,sampleRow);
+  await cdp('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...dragStart});await cdp('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,...dragEnd});await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...dragEnd});
+  await until('window.lazyreviewTui.getState().selectionText.length>0');assert.match(await evaluate('window.lazyreviewTui.getState().selectionText'),/SAMPLE/);
+  await key('Tab',8);await until('window.lazyreviewTui.getState().pane===1');await key('v');await key('j');await key('c');await until('window.lazyreviewTui.getState().modal==="Editor(Comment)"');await type('#input','A browser-only sample draft');await key('Enter');await until('window.lazyreviewTui.getState().drafts===1');
+  await key('r');await until('window.lazyreviewTui.getState().panel==="Review"');assert.match(await evaluate('window.lazyreviewTui.text()'),/review/i);
+  await key('S',8);await until('window.lazyreviewTui.getState().modal==="Editor(Review)"');await type('#input','Sample review, no GitHub write');await key('Tab');await key('Enter');await until('window.lazyreviewTui.getState().modal==="Confirm"');await key('Enter');await until('!window.lazyreviewTui.getState().modal&&window.lazyreviewTui.getState().drafts===0&&window.lazyreviewTui.getState().posted>0');
+  await click('#help');await until('window.lazyreviewTui.getState().modal==="Help"');await key('Escape');await until('!window.lazyreviewTui.getState().modal');
+  await key(']',2,'BracketRight');assert.equal(await evaluate('document.activeElement.id'),'help');
+  await mkdir(new URL('../outputs/',import.meta.url),{recursive:true});
+  for(const width of [1440,768,390]){await viewport(width,width<600?844:900);await wait(500);assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));assert.ok(await evaluate('document.documentElement.scrollHeight<=innerHeight+1'));const shot=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(new URL(`../outputs/interactive-tui-${width}.png`,import.meta.url),Buffer.from(shot.data,'base64'));}
+  await viewport(1440,900);
+  const nativeUrl=new URL('demo/tour/',homeUrl).href;
   await cdp('Page.navigate',{url:nativeUrl});
   for(let i=0;i<100;i++){if(await evaluate('!!window.reviewDemo && window.reviewDemo.getState().imageReady'))break;await wait(50);}
   assert.ok(await evaluate('window.reviewDemo.getState().imageReady'));
@@ -69,7 +108,7 @@ try{
   await cdp('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
   await evaluate('window.reviewDemo.seek(30)');assert.equal(await evaluate('document.querySelector("#camera").style.transition'),'none');
   await cdp('Emulation.setEmulatedMedia',{features:[]});await viewport(1440,900);
-  url=new URL('demo/',homeUrl).href;
+  url=new URL('demo/web/',homeUrl).href;
   await cdp('Page.navigate',{url});
   for(let i=0;i<100;i++){if(await evaluate('!!window.LR_SAMPLE && document.querySelector(".sim")?.hidden===false'))break;await wait(50);}
   assert.equal(await evaluate('document.querySelector(".sim").hidden'),false);
@@ -111,7 +150,7 @@ try{
   assert.equal(await evaluate('document.querySelector(".sim").hidden'),true);
   assert.ok(await evaluate('document.querySelector(".fallback-workspace").naturalWidth>0'));
   assert.deepEqual(errors,[]);assert.ok(requests.every(u=>u.startsWith(new URL(url).origin)||u.startsWith('data:')),'Unexpected external request');
-  console.log('PASS native /demo/tui/: pinned display profile, authentic cell images, playback, KeyCastr, actual-size pan, reduced motion and responsive layouts. PASS standalone /demo/: real Chrome, showcase links, 18 files, direct entry, full viewport, keyboard focus, filters, multi-file notes, escaping, scripted replies, Ctrl-], drafts, keyboard scope, mobile, reduced motion, no-JS fallback; no external requests.');
+  console.log('PASS interactive native /demo/: real Rust handlers, Vim navigation, file filtering, multi-file notes, scripted chat, drafts, mouse help and responsive resizing. PASS recorded /demo/tour/: pinned display profile, authentic cell images, playback, KeyCastr, actual-size pan, reduced motion and responsive layouts. PASS preserved /demo/web/: real Chrome, showcase links, 18 files, direct entry, full viewport, keyboard focus, filters, multi-file notes, escaping, scripted replies, Ctrl-], drafts, keyboard scope, mobile, reduced motion, no-JS fallback; no external requests.');
 }finally{
   if(ws?.readyState===WebSocket.OPEN){try{await send('Browser.close');}catch{}ws.close();}
   browser?.kill();server?.kill();await wait(250);await rm(profile,{recursive:true,force:true});

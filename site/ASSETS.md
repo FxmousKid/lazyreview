@@ -4,8 +4,9 @@ All product pictures come from the actual Ratatui renderer with synthetic PR dat
 
 - `workspace.webp`, `files.webp`, `context.webp`: frames 5, 1 and 11 of `demo/frames.json`, cropped in `render-stills.py`.
 - `review.webp`: the expanded synthetic review from `ui::tests::export_review_flow_preview`, cropped to the comment list.
-- `/demo/tui/`: lossless native frame images and the shared tour player. Image/source/profile hashes are checked during every site build.
+- `/demo/tour/`: lossless native frame images and the shared tour player. Image/source/profile hashes are checked during every site build.
 - `tour.mp4` in the built site: `demo/lazyreview-demo.mp4`, copied unchanged. See [the demo guide](../demo/README.md) for its timeline, renderer and scripted-reply disclosure.
+- `/demo/`: live Ratatui cell updates painted with the same pinned JetBrainsMono Nerd Font files and display profile. This is interactive sample state, not video.
 - Bricolage Grotesque: [Google Fonts source](https://github.com/google/fonts/tree/main/ofl/bricolagegrotesque), under the included `assets/Bricolage-OFL.txt` (SIL Open Font License).
 - The small LazyReview mark is project-authored SVG.
 

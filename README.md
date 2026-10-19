@@ -2,7 +2,7 @@
 
 Review GitHub pull requests in your terminal, with Vim keys and an AI companion.
 
-[TUI tour](demo/README.md) · [Web preview](demo/README.md) · [Full keymap](tui/README.md) · [AI setup](tui/CLI-INTEGRATIONS.md)
+[Interactive TUI demo](site/INTERACTIVE-TUI.md) · [Recorded tour](demo/README.md) · [Full keymap](tui/README.md) · [AI setup](tui/CLI-INTEGRATIONS.md)
 
 Filter code, tests and docs. Read inline or split diffs, queue private questions across files, and publish native GitHub reviews. Claude Code keeps a separate persistent chat for each PR; Codex and Grok also work in the terminal pane.
 
@@ -44,6 +44,6 @@ Settings: `~/.config/lazyreview/config.yml` ([example](tui/config.example.yml)).
 
 `npm test` · `cargo test --locked --manifest-path tui/Cargo.toml` · `npm run site:dev`
 
-The showcase in `site/` is static and works under `/lazyreview/`. The native TUI tour lives at `/lazyreview/demo/tui/`; the web preview remains at `/lazyreview/demo/`. Both use synthetic data and make no GitHub or AI requests.
+The showcase lives at `/lazyreview/`. Try the real TUI at `/lazyreview/demo/`: Vim keys, selections, AI notes and sample reviews. The web UI preview remains at `/lazyreview/demo/web/`; the recording is at `/lazyreview/demo/tour/`. Hosted sessions use isolated native processes and synthetic data.
 
 MIT © Iyan Nazarian

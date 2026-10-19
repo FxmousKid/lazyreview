@@ -273,7 +273,12 @@ pub struct Service {
 }
 impl Service {
     pub fn start() -> Result<Self, String> {
-        let mut bridge = Bridge::new()?;
+        Self::with_bridge(Bridge::new()?)
+    }
+    pub fn start_sample() -> Result<Self, String> {
+        Self::with_bridge(Bridge::sample_only()?)
+    }
+    fn with_bridge(mut bridge: Bridge) -> Result<Self, String> {
         let child = bridge.child.clone();
         let (tx, requests) = mpsc::sync_channel::<Option<Request>>(1);
         let (responses, rx) = mpsc::channel();

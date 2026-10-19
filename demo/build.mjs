@@ -99,6 +99,7 @@ export async function buildHosted(output) {
   let template = await readFile(resolve(here, 'index.html'), 'utf8');
   template = template.replace(/  <meta http-equiv="Content-Security-Policy"[^>]*>\n/, '')
     .replace('<!-- DEMO_STYLE -->', '<link rel="stylesheet" href="style.css">')
+    .replace('href="../">Web preview', 'href="../web/">Web preview')
     .replace(/  <script id="demo-data"[^>]*>.*?<\/script>\n/, '')
     .replace('<!-- DEMO_SCRIPT -->', '<script src="data.js"></script><script src="player.js"></script>');
   await Promise.all([

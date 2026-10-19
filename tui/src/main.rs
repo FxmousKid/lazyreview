@@ -3,6 +3,7 @@ mod ai;
 mod annotations;
 mod app;
 mod backend;
+mod browser_demo;
 mod clipboard;
 mod completion;
 mod copy_text;
@@ -238,6 +239,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
+    if args == ["--browser-demo"] {
+        return browser_demo::run();
+    }
     let mode = arguments(&args).map_err(io::Error::other)?;
     if mode == Mode::SetupAi {
         if ai_override.is_some() || provider_override.is_some() {

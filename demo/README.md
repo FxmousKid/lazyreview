@@ -1,6 +1,6 @@
 # A silent tour of LazyReview
 
-Open **`/lazyreview/demo/tui/`** on the showcase, open `lazyreview-demo.html` offline, or play `lazyreview-demo.mp4`. The separate browser UI preview remains at `/lazyreview/demo/`.
+Open **`/lazyreview/demo/tour/`** on the showcase, open `lazyreview-demo.html` offline, or play `lazyreview-demo.mp4`. The hands-on native TUI is at `/lazyreview/demo/`; the separate web UI preview is at `/lazyreview/demo/web/`.
 
 The tour follows two workflows: narrow a PR to the relevant code, then ask Claude about selections from two files. It lasts **88 seconds** across 17 scenes, with reading holds and separate title cards. A KeyCastr-style overlay shows each recent keystroke in the lower third as it occurs, holds the sequence for two seconds, then fades so the code stays readable. Future keys are never shown in advance. There is no keyboard diagram or narration.
 

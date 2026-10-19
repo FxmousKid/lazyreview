@@ -284,7 +284,7 @@ pub fn buffer_html_with_palette(buffer: &ratatui::buffer::Buffer, profile: &Valu
     html
 }
 
-fn terminal_color(c: Color, foreground: bool, profile: &Value) -> String {
+pub(crate) fn terminal_color(c: Color, foreground: bool, profile: &Value) -> String {
     let colors = &profile["colors"];
     let index = match c {
         Color::Indexed(i) if i < 16 => Some(i as usize),

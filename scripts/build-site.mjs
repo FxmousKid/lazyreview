@@ -15,8 +15,16 @@ export async function buildSite(){
  const template=await readFile(join(root,'site/demo/index.html'),'utf8');
  const workbench=(await readFile(join(root,'site/partials/workbench.html'),'utf8')).replaceAll('src="assets/','src="../assets/');
  if(template.split('<!-- WORKBENCH -->').length!==2)throw Error('Demo template must contain exactly one workspace');
- await writeFile(join(out,'demo/index.html'),template.replace('<!-- WORKBENCH -->',workbench));
- await buildHosted(join(out,'demo/tui'));
+ await mkdir(join(out,'demo/web'),{recursive:true});
+ const webTemplate=template.replaceAll('href="../','href="../../').replaceAll('src="../','src="../../').replace('href="tui/"','href="../"').replace('https://iyan.nz/lazyreview/demo/','https://iyan.nz/lazyreview/demo/web/');
+ const webWorkbench=workbench.replaceAll('src="../assets/','src="../../assets/');
+ await writeFile(join(out,'demo/web/index.html'),webTemplate.replace('<!-- WORKBENCH -->',webWorkbench));
+ await cp(join(root,'site/demo/demo.css'),join(out,'demo/web/demo.css'));
+ await cp(join(root,'site/terminal'),join(out,'demo'),{recursive:true});
+ await cp(join(root,'demo/fonts'),join(out,'demo/fonts'),{recursive:true});
+ const profile=await readFile(join(root,'demo/terminal-profile.json'),'utf8');
+ await writeFile(join(out,'demo/profile.js'),'window.LAZYREVIEW_TERMINAL_PROFILE='+JSON.stringify(JSON.parse(profile))+';\n');
+ await buildHosted(join(out,'demo/tour'));
  await cp(join(root,'demo/lazyreview-demo.mp4'),join(out,'assets/tour.mp4'));
  return out;
 }
