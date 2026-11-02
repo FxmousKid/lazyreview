@@ -20,6 +20,8 @@ gh auth login
 
 `./lazyreview --demo` runs offline. Open a PR directly with `--pr https://github.com/OWNER/REPO/pull/123`. Add `--ai-interface terminal` to embed Claude Code; sign in with `claude` first. The default Paper companion also uses your Claude Code login.
 
+In the chooser, `/` searches repositories and PR history. After selecting a repository, click **Authors** (`Tab`) for You / Anyone and **State** (`Shift-Tab`) for All / Open / Closed, including merged PRs.
+
 ## Keys
 
 | Key | Action |

@@ -25,18 +25,28 @@ with tempfile.TemporaryDirectory(prefix='rw-picker-search-') as td:
             read(.05)
             if text in screen.text():return
         raise AssertionError('Missing '+repr(text)+'\n'+screen.text())
+    def click(text):
+        rows=screen.text().splitlines();y=next(i for i,r in enumerate(rows) if text in r);x=rows[y].index(text)+1
+        send(f'\x1b[<0;{x};{y+1}M\x1b[<0;{x};{y+1}m')
     try:
         wait('acme/current');send('/');wait('archive/library')
         send('arclib');wait('1 repositories');send('\r');wait('Your PRs');wait('#42');wait('closed')
-        send('14 fx');wait('1 matches');assert '#42' not in screen.text();send('\r');wait('Changes · inline')
+        send('14 fx');wait('1 matches');assert '#42' not in screen.text()
+        send('\x1b[Z');wait('State: Open');wait('0 matches');assert '14 fx' in screen.text()
+        send('\x1b[Z');wait('State: Closed');wait('#14');wait('1 matches')
+        send('\x15');wait('2 matches');click('Authors: You');wait('All PRs');wait('#1235');wait('3 matches')
+        send('\t');wait('Your PRs');wait('2 matches');click('Authors: You');wait('All PRs');wait('3 matches')
+        click('State: Closed');wait('State: All');wait('4 matches')
+        click('State: All');wait('State: Open');wait('#1234');wait('1 matches');assert '#1235' not in screen.text()
+        send('\x1b[Z');wait('State: Closed');send('14 fx');wait('1 matches');send('\r');wait('Changes · inline')
         send('\x10');wait('Repositories')
         # The visible Search control opens the same floating workflow.
-        rows=screen.text().splitlines();y=next(i for i,r in enumerate(rows) if 'Search /' in r);x=rows[y].index('Search /')+1
-        send(f'\x1b[<0;{x};{y+1}M\x1b[<0;{x};{y+1}m');wait('archive/library')
+        click('Search /');wait('archive/library')
         send('\x12');send('\x1b');send('\x1b');wait('Changes · inline');read(1);assert 'Changes · inline' in screen.text(), 'Late search result replaced the active review'
-        send('\x10');wait('Repositories');send('/');wait('archive/library');send('\x1b[200~someone/project\x1b[201~');wait('Browse this repository');send('\r');wait('All PRs');wait('#1234')
-        send('234 ext');wait('1 matches');send('\r');wait('Changes · inline');send('q');proc.wait(timeout=5);assert proc.returncode==0
-        print('PASS floating search: fuzzy repositories, closed/merged authored PRs, number/title matching, clickable Search, Escape, pasted external repo; offline')
+        send('\x10');wait('Repositories');send('/');wait('archive/library');send('\x1b[200~someone/project\x1b[201~');wait('Browse this repository');send('\r');wait('All PRs');wait('#1235')
+        # State survives repository changes; return to All before searching the open PR.
+        click('State: Closed');wait('State: All');send('234 ext');wait('1 matches');send('\r');wait('Changes · inline');send('q');proc.wait(timeout=5);assert proc.returncode==0
+        print('PASS floating search: combined author/state filters by key and mouse, preserved query, merged/closed and unrelated PRs, fuzzy matching, Escape, pasted external repo; offline')
     finally:
         if proc.poll() is None:proc.terminate();proc.wait(timeout=5)
         os.close(master)

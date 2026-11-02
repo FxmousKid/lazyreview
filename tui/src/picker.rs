@@ -18,6 +18,38 @@ enum Editing {
     Repository,
     Url,
 }
+#[derive(Clone, Copy, Default)]
+enum PrState {
+    #[default]
+    All,
+    Open,
+    Closed,
+}
+impl PrState {
+    fn next(self) -> Self {
+        match self {
+            Self::All => Self::Open,
+            Self::Open => Self::Closed,
+            Self::Closed => Self::All,
+        }
+    }
+    fn label(self) -> &'static str {
+        match self {
+            Self::All => "All",
+            Self::Open => "Open",
+            Self::Closed => "Closed",
+        }
+    }
+    fn matches(self, state: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Open => state.eq_ignore_ascii_case("OPEN"),
+            Self::Closed => {
+                state.eq_ignore_ascii_case("CLOSED") || state.eq_ignore_ascii_case("MERGED")
+            }
+        }
+    }
+}
 #[derive(Default)]
 struct Search {
     open: bool,
@@ -27,6 +59,7 @@ struct Search {
     selected: usize,
     repository: Option<String>,
     all_authors: bool,
+    state: PrState,
     repos: Vec<V>,
     own: Vec<V>,
     external: Vec<V>,
@@ -35,6 +68,8 @@ struct Search {
     error: String,
     area: Rect,
     list_area: Rect,
+    author_button: Rect,
+    state_button: Rect,
     visible_rows: Vec<Rect>,
     offset: usize,
 }
@@ -173,6 +208,7 @@ impl Picker {
                 .iter()
                 .filter(|v| {
                     s(v, "repository").eq_ignore_ascii_case(repo)
+                        && self.search.state.matches(s(v, "state"))
                         && fuzzy(
                             q,
                             &format!("#{} {} {}", v["number"], s(v, "title"), s(v, "author")),
@@ -216,6 +252,27 @@ impl Picker {
         }
         None
     }
+    fn toggle_search_authors(&mut self) -> Option<V> {
+        if self.search.busy || self.search.repository.is_none() {
+            return None;
+        }
+        self.search.all_authors = !self.search.all_authors;
+        self.search.selected = 0;
+        self.search.offset = 0;
+        self.search.error.clear();
+        let repo = self.search.repository.as_ref().unwrap();
+        if self.search.all_authors && self.search.external_repo != *repo {
+            self.search.busy = true;
+            self.search.external.clear();
+            return Some(json!({"operation":"history","repository":repo}));
+        }
+        None
+    }
+    fn cycle_search_state(&mut self) {
+        self.search.state = self.search.state.next();
+        self.search.selected = 0;
+        self.search.offset = 0;
+    }
     fn search_key(&mut self, key: KeyEvent) -> Option<V> {
         let count = self.search_items().len();
         match key.code {
@@ -252,17 +309,8 @@ impl Picker {
                     json!({"operation":"history","repository":if self.search.all_authors {self.search.repository.clone()} else {None}}),
                 );
             }
-            K::Tab if self.search.repository.is_some() && !self.search.busy => {
-                self.search.all_authors = !self.search.all_authors;
-                self.search.selected = 0;
-                self.search.error.clear();
-                let repo = self.search.repository.as_ref().unwrap();
-                if self.search.all_authors && self.search.external_repo != *repo {
-                    self.search.busy = true;
-                    self.search.external.clear();
-                    return Some(json!({"operation":"history","repository":repo}));
-                }
-            }
+            K::Tab if self.search.repository.is_some() => return self.toggle_search_authors(),
+            K::BackTab if self.search.repository.is_some() => self.cycle_search_state(),
             K::Char(c) if !key.modifiers.intersects(M::CONTROL | M::ALT) => {
                 if self.search.query.len() < 200 {
                     self.search.query.push(c);
@@ -637,6 +685,10 @@ impl Picker {
                 MouseEventKind::Down(MouseButton::Left) => {
                     if !self.search.area.contains(point) {
                         self.search.open = false;
+                    } else if self.search.author_button.contains(point) {
+                        return self.toggle_search_authors();
+                    } else if self.search.state_button.contains(point) {
+                        self.cycle_search_state();
                     } else if let Some(i) = self
                         .search
                         .visible_rows
@@ -801,15 +853,62 @@ impl Picker {
             .style(Style::default().bg(theme().bg).fg(theme().fg));
         let inner = block.inner(popup);
         f.render_widget(block, popup);
-        let rows =
-            Layout::vertical([C::Length(2), C::Min(1), C::Length(2), C::Length(1)]).split(inner);
+        let rows = Layout::vertical([
+            C::Length(2),
+            C::Length(if self.search.repository.is_some() {
+                2
+            } else {
+                0
+            }),
+            C::Min(1),
+            C::Length(2),
+            C::Length(1),
+        ])
+        .split(inner);
         f.render_widget(
             Paragraph::new(format!(" ⌕ {}▏", clean(&self.search.query)))
                 .style(Style::default().fg(theme().accent)),
             rows[0],
         );
+        self.search.author_button = Rect::default();
+        self.search.state_button = Rect::default();
+        if self.search.repository.is_some() {
+            let authors = Line::from(vec![
+                Span::styled(
+                    if self.search.all_authors {
+                        " Authors: Anyone "
+                    } else {
+                        " Authors: You "
+                    },
+                    theme().selected,
+                ),
+                Span::styled(" Tab", Style::default().fg(theme().muted)),
+            ]);
+            let state = Line::from(vec![
+                Span::styled(
+                    format!(" State: {} ", self.search.state.label()),
+                    theme().selected,
+                ),
+                Span::styled(" S-Tab", Style::default().fg(theme().muted)),
+            ]);
+            let buttons = Layout::horizontal([
+                C::Length(authors.width() as u16),
+                C::Length(2),
+                C::Length(state.width() as u16),
+            ])
+            .split(Rect::new(
+                rows[1].x,
+                rows[1].y,
+                rows[1].width,
+                rows[1].height.min(1),
+            ));
+            self.search.author_button = buttons[0];
+            self.search.state_button = buttons[2];
+            f.render_widget(Paragraph::new(authors), buttons[0]);
+            f.render_widget(Paragraph::new(state), buttons[2]);
+        }
         let items = self.search_items();
-        let visible = (rows[1].height as usize / 2).max(1);
+        let visible = (rows[2].height as usize / 2).max(1);
         self.search.selected = self.search.selected.min(items.len().saturating_sub(1));
         if self.search.selected < self.search.offset {
             self.search.offset = self.search.selected;
@@ -818,7 +917,7 @@ impl Picker {
             self.search.offset = self.search.selected + 1 - visible;
         }
         self.search.offset = self.search.offset.min(items.len().saturating_sub(visible));
-        self.search.list_area = rows[1];
+        self.search.list_area = rows[2];
         self.search.visible_rows.clear();
         if self.search.busy {
             let glyph = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
@@ -832,7 +931,7 @@ impl Picker {
                         "your repositories and PR history"
                     }
                 )),
-                rows[1],
+                rows[2],
             );
         } else if items.is_empty() {
             let text = if self.search.repository.is_none() {
@@ -842,7 +941,7 @@ impl Picker {
             } else {
                 " No matching PRs by you · Tab All authors"
             };
-            f.render_widget(Paragraph::new(text).wrap(Wrap { trim: false }), rows[1]);
+            f.render_widget(Paragraph::new(text).wrap(Wrap { trim: false }), rows[2]);
         } else {
             for (row, (index, v)) in items
                 .iter()
@@ -852,10 +951,10 @@ impl Picker {
                 .enumerate()
             {
                 let rect = Rect::new(
-                    rows[1].x,
-                    rows[1].y + row as u16 * 2,
-                    rows[1].width,
-                    2.min(rows[1].height.saturating_sub(row as u16 * 2)),
+                    rows[2].x,
+                    rows[2].y + row as u16 * 2,
+                    rows[2].width,
+                    2.min(rows[2].height.saturating_sub(row as u16 * 2)),
                 );
                 self.search.visible_rows.push(rect);
                 let (label, meta) = if self.search.repository.is_none() {
@@ -914,10 +1013,7 @@ impl Picker {
         } else if !self.search.warning.is_empty() {
             self.search.warning.clone()
         } else if self.search.repository.is_some() {
-            format!(
-                " {} matches · newest first · open, merged and closed",
-                items.len()
-            )
+            format!(" {} matches · newest first", items.len())
         } else {
             format!(" {} repositories · recent contributions first", items.len())
         };
@@ -925,16 +1021,16 @@ impl Picker {
             Paragraph::new(clean(&message))
                 .wrap(Wrap { trim: false })
                 .style(Style::default().fg(theme().muted)),
-            rows[2],
+            rows[3],
         );
         let hint = if self.search.repository.is_some() {
-            " ↑↓ Select · Enter Open · Tab Authors · Alt-← Repos · Esc Close"
+            " ↑↓ Select · Enter Open · Alt-← Repos · Esc Close"
         } else {
             " ↑↓ Select · Enter Open · owner/repo Browse · Esc Close"
         };
         f.render_widget(
             Paragraph::new(hint).style(Style::default().fg(theme().muted)),
-            rows[3],
+            rows[4],
         );
     }
     fn border(&self, title: String, index: usize) -> Block<'static> {
@@ -1241,6 +1337,47 @@ mod tests {
         assert!(!p.quit);
     }
     #[test]
+    fn history_author_and_state_filters_combine_without_losing_the_query() {
+        let mut p = loaded();
+        p.open_search();
+        let mine = json!({"repository":"a/b","number":1,"title":"Cache fix","state":"OPEN"});
+        p.receive_history(Ok(
+            json!({"kind":"catalog","repositories":[{"name":"a/b"}],"items":[mine]}),
+        ));
+        p.key(KeyEvent::new(K::Enter, M::NONE));
+        p.paste("cache");
+        p.search.selected = 20;
+        let request = p.key(KeyEvent::new(K::Tab, M::NONE)).unwrap();
+        assert_eq!(request["repository"], "a/b");
+        assert_eq!(p.search.selected, 0);
+        // State can change while the all-author request is in flight.
+        assert!(p.key(KeyEvent::new(K::BackTab, M::SHIFT)).is_none());
+        p.receive_history(Ok(json!({"kind":"pulls","repository":"a/b","items":[
+            mine,
+            {"repository":"a/b","number":2,"title":"Cache update","author":"other","state":"OPEN"},
+            {"repository":"a/b","number":3,"title":"Cache merged","author":"other","state":"MERGED"},
+            {"repository":"a/b","number":4,"title":"Cache closed","author":"other","state":"CLOSED"},
+            {"repository":"a/b","number":5,"title":"Unrelated","author":"other","state":"OPEN"}
+        ]})));
+        let numbers = |p: &Picker| {
+            p.search_items()
+                .iter()
+                .map(|v| v["number"].as_u64().unwrap())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(numbers(&p), vec![1, 2]);
+        assert!(p.key(KeyEvent::new(K::BackTab, M::SHIFT)).is_none());
+        assert_eq!(numbers(&p), vec![3, 4]);
+        assert!(p.key(KeyEvent::new(K::Tab, M::NONE)).is_none());
+        assert!(p.search_items().is_empty());
+        assert!(p.key(KeyEvent::new(K::Enter, M::NONE)).is_none());
+        assert!(p.key(KeyEvent::new(K::Tab, M::NONE)).is_none()); // Cached, no request.
+        assert_eq!(numbers(&p), vec![3, 4]);
+        assert!(p.key(KeyEvent::new(K::BackTab, M::SHIFT)).is_none());
+        assert_eq!(numbers(&p), vec![1, 2, 3, 4]);
+        assert_eq!(p.search.query, "cache");
+    }
+    #[test]
     fn fuzzy_queries_are_case_insensitive_subsequences_and_all_tokens_match() {
         assert!(fuzzy("lr pr42", "LazyReview #PR42"));
         assert!(fuzzy("14 cache", "#14 Fix cache eviction"));
@@ -1265,6 +1402,36 @@ mod tests {
                 modifiers: M::NONE,
             });
             assert_eq!(p.search.repository.as_deref(), Some("archive/library"));
+            terminal.draw(|f| p.render(f)).unwrap();
+            let rendered = terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<String>();
+            assert!(rendered.contains("Authors: You"));
+            assert!(rendered.contains("State: All"));
+            assert!(rendered.contains("S-Tab"));
+            let button = p.search.state_button;
+            p.mouse(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: button.x,
+                row: button.y,
+                modifiers: M::NONE,
+            });
+            assert_eq!(p.search.state.label(), "Open");
+            let button = p.search.author_button;
+            let request = p
+                .mouse(MouseEvent {
+                    kind: MouseEventKind::Down(MouseButton::Left),
+                    column: button.x,
+                    row: button.y,
+                    modifiers: M::NONE,
+                })
+                .unwrap();
+            assert_eq!(request["repository"], "archive/library");
+            assert!(p.search.open);
         }
     }
 }

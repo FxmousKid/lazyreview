@@ -17,7 +17,9 @@ The launcher uses `bin/lazyreview` when installed, otherwise `tui/target/release
 
 Without arguments, choose a repository and then a PR. Repositories containing your authored open PRs are sorted by the latest authored PR/default-branch commit; their PR pane includes all authors. `h/l` changes panes, `j/k` moves within one, and Enter opens the selection.
 
-Press `/` or click Search for the floating history finder. Fuzzy-search your repositories, select one, then search your authored PRs by title/number (all states, newest-created first). Tab switches to all authors. An exact `owner/repo` opens repositories outside your history, including public repositories without login. Ctrl-r refreshes; Escape closes the popup. Arrows / Ctrl-j/k select, Alt-Left returns to repositories, and bracketed paste fills the query.
+Press `/` or click Search for the floating history finder. Fuzzy-search your repositories, select one, then search PRs by title, number or author, newest-created first. The clickable **Authors** filter toggles You / Anyone (`Tab`); **State** cycles All / Open / Closed (`Shift-Tab`). Closed includes merged PRs. Anyone includes PRs you neither authored nor were asked to review. Filters combine with your query and preserve it when switched; changing state filters the loaded history without another request.
+
+An exact `owner/repo` opens repositories outside your history, including public repositories without login. Ctrl-r refreshes; Escape closes the popup. Arrows / Ctrl-j/k select, Alt-Left returns to repositories, and bracketed paste fills the query.
 
 ### Chooser keys
 

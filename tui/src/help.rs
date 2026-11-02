@@ -190,6 +190,10 @@ const KEYS: &[(&str, &str)] = &[
         "Toggle PR authors / return to repositories",
     ),
     ("Ctrl-r (search)", "Refresh repository or PR history"),
+    (
+        "Shift-Tab (search)",
+        "Filter PR state: all / open / closed (including merged)",
+    ),
     ("r / o / d (chooser)", "Refresh / paste PR URL / open demo"),
     ("? / g ? / g !", "Open keyboard shortcuts"),
     ("f (shortcuts)", "Filter shortcut keys and descriptions"),
