@@ -23,7 +23,9 @@ async function stop(child){
 }
 async function close(){
   if(ws?.readyState===WebSocket.OPEN){try{await send('Browser.close');}catch{}ws.close();}
-  await Promise.all([stop(browser),stop(server)]);await rm(profile,{recursive:true,force:true});
+  await Promise.all([stop(browser),stop(server)]);
+  // Chromium helpers may finish profile writes just after the browser exits.
+  await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:100});
 }
 try{
   if(!url){server=spawn(process.execPath,['scripts/serve-site.mjs'],{cwd:root,env:{...process.env,PORT:'0'},stdio:['ignore','pipe','pipe']});
